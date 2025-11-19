@@ -2950,6 +2950,7 @@ dependencies = [
  "solver-performance",
  "solver-plugins",
  "solver-privacy-sandbox",
+ "solver-pwa-platform",
  "solver-rendering-plugin",
  "tokio",
 ]
@@ -3013,6 +3014,21 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "solver-core",
+ "solver-plugins",
+ "tokio",
+ "url",
+]
+
+[[package]]
+name = "solver-pwa-platform"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "parking_lot",
+ "serde",
+ "serde_json",
  "solver-core",
  "solver-plugins",
  "tokio",

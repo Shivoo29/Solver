@@ -1,0 +1,26 @@
+[package]
+name = "solver-pwa-platform"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+solver-core = { path = "../../solver-core" }
+solver-plugins = { path = "../../solver-plugins" }
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+async-trait = "0.1"
+
+# PWA features
+parking_lot = "0.12"
+url = "2.5"
+
+[features]
+default = ["service-worker", "app-manifest", "offline-storage"]
+service-worker = []
+app-manifest = []
+offline-storage = []
+background-sync = []
+push-notifications = []
