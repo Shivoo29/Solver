@@ -13,6 +13,7 @@ members = [
     "solver-std-plugins/privacy-sandbox",
     "solver-std-plugins/performance",
     "solver-std-plugins/pwa-platform",
+    "solver-std-plugins/plugin-marketplace",
 
     # Demo browser
     "solver-demo",

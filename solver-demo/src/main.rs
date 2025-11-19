@@ -2,6 +2,7 @@ mod ai_demo;
 mod privacy_demo;
 mod performance_demo;
 mod pwa_demo;
+mod marketplace_demo;
 mod full_demo;
 
 use anyhow::Result;
@@ -41,6 +42,10 @@ struct Args {
     /// Run PWA platform demo
     #[arg(long)]
     pwa_demo: bool,
+
+    /// Run plugin marketplace demo
+    #[arg(long)]
+    marketplace_demo: bool,
 }
 
 #[tokio::main]
@@ -72,8 +77,13 @@ async fn main() -> Result<()> {
         return pwa_demo::run_pwa_demo().await;
     }
 
+    // Run marketplace demo if requested
+    if args.marketplace_demo {
+        return marketplace_demo::run_marketplace_demo().await;
+    }
+
     // Require URL if not running demo
-    let url = args.url.ok_or_else(|| anyhow::anyhow!("URL required (or use --ai-demo, --privacy-demo, --performance-demo, --pwa-demo, or --full-demo)"))?;
+    let url = args.url.ok_or_else(|| anyhow::anyhow!("URL required (or use --ai-demo, --privacy-demo, --performance-demo, --pwa-demo, --marketplace-demo, or --full-demo)"))?;
 
     println!("Solver Browser - Plugin Architecture Demo");
     println!("=========================================\n");
