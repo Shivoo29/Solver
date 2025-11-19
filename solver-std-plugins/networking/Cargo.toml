@@ -1,0 +1,13 @@
+[package]
+name = "solver-networking-plugin"
+version = "0.1.0"
+edition = "2021"
+authors = ["Solver Team"]
+
+[dependencies]
+solver-core = { path = "../../solver-core" }
+solver-plugins = { path = "../../solver-plugins" }
+anyhow = "1.0"
+async-trait = "0.1"
+reqwest = { version = "0.12", features = ["rustls-tls"] }
+tokio = { version = "1.40", features = ["full"] }
