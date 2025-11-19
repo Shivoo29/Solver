@@ -218,9 +218,23 @@ impl CssParser {
         assert_eq!(self.consume_char(), '#');
         let hex = self.consume_while(|c| c.is_ascii_hexdigit());
 
-        let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
-        let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
-        let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+        // Handle both 3-char (#RGB) and 6-char (#RRGGBB) hex colors
+        let (r, g, b) = if hex.len() == 3 {
+            // Expand 3-char format: #RGB -> #RRGGBB
+            let r = u8::from_str_radix(&format!("{}{}", &hex[0..1], &hex[0..1]), 16).unwrap_or(0);
+            let g = u8::from_str_radix(&format!("{}{}", &hex[1..2], &hex[1..2]), 16).unwrap_or(0);
+            let b = u8::from_str_radix(&format!("{}{}", &hex[2..3], &hex[2..3]), 16).unwrap_or(0);
+            (r, g, b)
+        } else if hex.len() >= 6 {
+            // Standard 6-char format
+            let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+            let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+            let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+            (r, g, b)
+        } else {
+            // Invalid hex color, default to black
+            (0, 0, 0)
+        };
 
         Value::Color(Color::new(r, g, b, 255))
     }

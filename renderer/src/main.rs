@@ -202,7 +202,10 @@ fn execute_javascript(dom: &dom::Node) -> Result<()> {
 
     if !scripts.is_empty() {
         eprintln!("Found {} script(s) to execute", scripts.len());
-        let engine = js_engine::JavaScriptEngine::new()?;
+        let mut engine = js_engine::JavaScriptEngine::new()?;
+
+        // Set the DOM in the JavaScript engine so it can be accessed
+        engine.set_dom(dom.clone());
 
         for (idx, script) in scripts.iter().enumerate() {
             eprintln!("Executing script {}...", idx + 1);
