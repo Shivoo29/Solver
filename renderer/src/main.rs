@@ -4,9 +4,9 @@ mod html_parser;
 mod layout;
 mod render;
 mod style;
-// mod js_engine;  // Disabled due to rquickjs build complexity
+mod js_engine;
 mod images;
-mod fonts;  // Enabled for proper text rendering
+mod fonts;
 
 use anyhow::Result;
 use shared::{BrowserMessage, RendererMessage};
@@ -69,9 +69,9 @@ fn render_html(html: &str, width: u32, height: u32) -> Result<Vec<u8>> {
     eprintln!("Parsing HTML...");
     let dom = html_parser::HtmlParser::parse(html.to_string());
 
-    // JavaScript execution disabled for now
-    // TODO: Integrate JavaScript engine in production build
-    // execute_javascript(&dom)?;
+    // Execute JavaScript
+    eprintln!("Executing JavaScript...");
+    execute_javascript(&dom)?;
 
     // Extract and parse CSS
     eprintln!("Parsing CSS...");
@@ -98,23 +98,31 @@ fn render_html(html: &str, width: u32, height: u32) -> Result<Vec<u8>> {
     Ok(canvas.pixels)
 }
 
-// JavaScript execution - disabled for now due to rquickjs build complexity
-// In production, this would execute JavaScript from <script> tags
-// #[allow(dead_code)]
-// fn execute_javascript(dom: &dom::Node) -> Result<()> {
-//     let scripts = js_engine::extract_scripts(dom);
-//     if !scripts.is_empty() {
-//         let engine = js_engine::JavaScriptEngine::new()?;
-//         for script in scripts {
-//             eprintln!("Executing script...");
-//             match engine.execute(&script) {
-//                 Ok(result) => eprintln!("Script result: {}", result),
-//                 Err(e) => eprintln!("Script error: {}", e),
-//             }
-//         }
-//     }
-//     Ok(())
-// }
+fn execute_javascript(dom: &dom::Node) -> Result<()> {
+    let scripts = js_engine::extract_scripts(dom);
+
+    if !scripts.is_empty() {
+        eprintln!("Found {} script(s) to execute", scripts.len());
+        let engine = js_engine::JavaScriptEngine::new()?;
+
+        for (idx, script) in scripts.iter().enumerate() {
+            eprintln!("Executing script {}...", idx + 1);
+            match engine.execute(&script) {
+                Ok(result) => {
+                    if !result.is_empty() && result != "undefined" {
+                        eprintln!("Script {} result: {}", idx + 1, result);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Script {} error: {}", idx + 1, e);
+                    // Continue execution even if script fails
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
 
 fn extract_css(node: &dom::Node) -> String {
     let mut css = String::new();

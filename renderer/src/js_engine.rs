@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rquickjs::{Context, Runtime, Function, Object, Value};
+use rquickjs::{Context, Runtime, Function, Object, CatchResultExt};
 use crate::dom::Node;
 use std::sync::{Arc, Mutex};
 
@@ -30,23 +30,28 @@ impl JavaScriptEngine {
             // Set up browser globals
             self.setup_browser_apis(&ctx)?;
 
-            // Execute the script
-            match ctx.eval::<Value, _>(script) {
-                Ok(value) => {
-                    if value.is_undefined() {
-                        Ok("undefined".to_string())
-                    } else if value.is_null() {
-                        Ok("null".to_string())
-                    } else {
-                        Ok(value.as_string()
-                            .and_then(|s| s.to_string().ok())
-                            .unwrap_or_else(|| format!("{:?}", value)))
-                    }
-                }
-                Err(e) => {
-                    Err(anyhow::anyhow!("JavaScript error: {:?}", e))
-                }
-            }
+            // Execute the script and get a Value
+            let result: rquickjs::Value = ctx.eval(script).catch(&ctx)
+                .map_err(|e| anyhow::anyhow!("JavaScript error: {:?}", e))?;
+
+            // Convert result to string based on type
+            let result_str = if result.is_undefined() {
+                "undefined".to_string()
+            } else if result.is_null() {
+                "null".to_string()
+            } else if let Some(b) = result.as_bool() {
+                b.to_string()
+            } else if let Some(n) = result.as_int() {
+                n.to_string()
+            } else if let Some(n) = result.as_float() {
+                n.to_string()
+            } else if let Some(s) = result.as_string() {
+                s.to_string().unwrap_or_else(|_| String::from("[string]"))
+            } else {
+                format!("{:?}", result)
+            };
+
+            Ok(result_str)
         })
     }
 
@@ -54,44 +59,29 @@ impl JavaScriptEngine {
         // Set up console API
         let console = Object::new(ctx.clone())?;
 
-        let log_fn = Function::new(ctx.clone(), |args: Vec<Value>| {
-            let messages: Vec<String> = args.iter()
-                .filter_map(|v| {
-                    v.as_string()
-                        .and_then(|s| s.to_string().ok())
-                        .or_else(|| Some(format!("{:?}", v)))
-                })
-                .collect();
-            eprintln!("[JS Console] {}", messages.join(" "));
-            Ok(())
+        // Create log function
+        let log_fn = Function::new(ctx.clone(), |msg: String| {
+            eprintln!("[JS Console] {}", msg);
+            Ok::<(), rquickjs::Error>(())
         })?;
 
-        console.set("log", log_fn)?;
-        console.set("error", console.get::<_, Function>("log")?)?;
-        console.set("warn", console.get::<_, Function>("log")?)?;
-        console.set("info", console.get::<_, Function>("log")?)?;
+        console.set("log", log_fn.clone())?;
+        console.set("error", log_fn.clone())?;
+        console.set("warn", log_fn.clone())?;
+        console.set("info", log_fn)?;
 
         ctx.globals().set("console", console)?;
 
-        // Set up alert (just logs for now)
+        // Set up alert
         let alert_fn = Function::new(ctx.clone(), |msg: String| {
             eprintln!("[JS Alert] {}", msg);
-            Ok(())
+            Ok::<(), rquickjs::Error>(())
         })?;
         ctx.globals().set("alert", alert_fn)?;
 
         // Set up basic document object
         let document = Object::new(ctx.clone())?;
-
-        let get_element_by_id = Function::new(ctx.clone(), |_id: String| {
-            // Simplified: return null for now
-            // In full implementation, this would search the DOM
-            Ok(Value::new_null(rquickjs::Ctx::new(&rquickjs::Runtime::new().unwrap())))
-        })?;
-
-        document.set("getElementById", get_element_by_id)?;
         document.set("title", "Solver Browser")?;
-
         ctx.globals().set("document", document)?;
 
         // Set up window object
@@ -116,23 +106,6 @@ impl JavaScriptEngine {
         ctx.globals().set("location", location)?;
 
         Ok(())
-    }
-
-    pub fn call_function(&self, function_name: &str, args: &[&str]) -> Result<String> {
-        self.context.with(|ctx| {
-            let global = ctx.globals();
-            let function: Function = global.get(function_name)?;
-
-            let js_args: Vec<Value> = args.iter()
-                .map(|&arg| Value::new_string(ctx.clone(), arg).unwrap())
-                .collect();
-
-            let result: Value = function.call(js_args)?;
-
-            Ok(result.as_string()
-                .and_then(|s| s.to_string().ok())
-                .unwrap_or_else(|| format!("{:?}", result)))
-        })
     }
 }
 
@@ -178,5 +151,12 @@ mod tests {
         let engine = JavaScriptEngine::new().unwrap();
         // This should print to stderr
         let _ = engine.execute("console.log('Hello from JavaScript!')");
+    }
+
+    #[test]
+    fn test_variables() {
+        let engine = JavaScriptEngine::new().unwrap();
+        let result = engine.execute("var x = 10; var y = 20; x + y").unwrap();
+        assert_eq!(result, "30");
     }
 }

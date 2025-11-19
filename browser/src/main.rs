@@ -153,6 +153,13 @@ fn fetch_url(url: &str) -> Result<String> {
         .highlight { background-color: yellow; color: red; }
         div { margin: 10px; padding: 5px; }
     </style>
+    <script>
+        console.log('Solver Browser JavaScript is WORKING!');
+        console.log('1 + 1 =', 1 + 1);
+        var message = 'Hello from JavaScript!';
+        console.log(message);
+        alert('JavaScript Enabled!');
+    </script>
 </head>
 <body>
     <h1>Welcome to Solver Browser!</h1>
@@ -163,7 +170,14 @@ fn fetch_url(url: &str) -> Result<String> {
         <p>Memory-safe Rust rendering engine</p>
         <p>Multi-process sandboxed architecture</p>
         <p>No telemetry or tracking</p>
+        <p>JavaScript engine (QuickJS via rquickjs) - WORKING!</p>
     </div>
+    <script>
+        console.log('Second script tag also executing!');
+        var x = 10;
+        var y = 20;
+        console.log('Math test: 10 + 20 =', x + y);
+    </script>
 </body>
 </html>
         "#.to_string());

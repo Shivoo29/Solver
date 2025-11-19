@@ -9,9 +9,8 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 
-# JavaScript engine - commented out due to build complexity
-# Will need custom compilation in production
-# rquickjs = { version = "0.6", features = ["array-buffer", "classes"] }
+# JavaScript engine
+rquickjs = { version = "0.6", features = ["array-buffer", "classes"] }
 
 # Image decoding
 image = "0.25"
