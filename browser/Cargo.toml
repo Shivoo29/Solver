@@ -14,8 +14,30 @@ gtk = { version = "0.9", package = "gtk4", optional = true }
 gdk = { version = "0.9", package = "gdk4", optional = true }
 gdk-pixbuf = { version = "0.20", optional = true }
 glib = { version = "0.20", optional = true }
-reqwest = { version = "0.12", features = ["blocking"] }
+
+# Networking with HTTPS, cookies, and more features
+reqwest = { version = "0.12", features = ["blocking", "cookies", "gzip", "brotli", "json"] }
 image = "0.25"
+
+# Cookie jar
+cookie_store = "0.21"
+
+# URL parsing
+url = "2.5"
+
+# HTML5 parsing (production-grade parser)
+html5ever = "0.27"
+markup5ever_rcdom = "0.3"
+
+# Better CSS parsing
+cssparser = "0.34"
+selectors = "0.25"
+
+# Cache
+lru = "0.12"
+
+# Compression
+flate2 = "1.0"
 
 [features]
 default = []

@@ -2,6 +2,16 @@
 
 A minimal, secure, privacy-focused web browser built entirely from scratch in Rust.
 
+## ⚠️ Project Status
+
+**Current Version**: v0.2 (Enhanced Prototype)
+**Code**: ~8,000+ lines of Rust
+**Status**: Working browser with production infrastructure ready
+
+This is a **functional browser prototype**, not a production browser. It successfully demonstrates browser architecture and core rendering pipeline, with infrastructure in place for JavaScript, images, fonts, HTTPS, and more advanced features.
+
+**For production roadmap**: See [PRODUCTION_ROADMAP.md](PRODUCTION_ROADMAP.md) - detailed plan to reach production quality (estimated 2-5 years, team of 50-100+ engineers, millions of additional LOC).
+
 ## Overview
 
 Solver is a functional web browser prototype that demonstrates:
@@ -9,6 +19,7 @@ Solver is a functional web browser prototype that demonstrates:
 - **Privacy by Design**: Zero telemetry, zero tracking, built-in blockers
 - **Multi-Process Architecture**: Sandboxed renderer process for isolation
 - **Complete Implementation**: From HTML parsing to bitmap rendering
+- **Production Infrastructure**: JavaScript, images, fonts, HTTPS modules ready to integrate
 
 ## Key Features
 

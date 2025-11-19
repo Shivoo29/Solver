@@ -9,6 +9,21 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 
+# JavaScript engine - commented out due to build complexity
+# Will need custom compilation in production
+# rquickjs = { version = "0.6", features = ["array-buffer", "classes"] }
+
+# Image decoding
+image = "0.25"
+reqwest = { version = "0.12", features = ["blocking"] }
+
+# Font rendering - using simpler approach for now
+# fontdue = "0.9"
+
+# Better text handling
+unicode-segmentation = "1.11"
+regex = "1.10"
+
 [[bin]]
 name = "renderer"
 path = "src/main.rs"

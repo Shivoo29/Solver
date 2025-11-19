@@ -4,6 +4,9 @@ mod html_parser;
 mod layout;
 mod render;
 mod style;
+// mod js_engine;  // Disabled due to rquickjs build complexity
+mod images;
+// mod fonts;  // Disabled - using simple text rendering for now
 
 use anyhow::Result;
 use shared::{BrowserMessage, RendererMessage};
@@ -66,6 +69,10 @@ fn render_html(html: &str, width: u32, height: u32) -> Result<Vec<u8>> {
     eprintln!("Parsing HTML...");
     let dom = html_parser::HtmlParser::parse(html.to_string());
 
+    // JavaScript execution disabled for now
+    // TODO: Integrate JavaScript engine in production build
+    // execute_javascript(&dom)?;
+
     // Extract and parse CSS
     eprintln!("Parsing CSS...");
     let css = extract_css(&dom);
@@ -90,6 +97,24 @@ fn render_html(html: &str, width: u32, height: u32) -> Result<Vec<u8>> {
     eprintln!("Render complete!");
     Ok(canvas.pixels)
 }
+
+// JavaScript execution - disabled for now due to rquickjs build complexity
+// In production, this would execute JavaScript from <script> tags
+// #[allow(dead_code)]
+// fn execute_javascript(dom: &dom::Node) -> Result<()> {
+//     let scripts = js_engine::extract_scripts(dom);
+//     if !scripts.is_empty() {
+//         let engine = js_engine::JavaScriptEngine::new()?;
+//         for script in scripts {
+//             eprintln!("Executing script...");
+//             match engine.execute(&script) {
+//                 Ok(result) => eprintln!("Script result: {}", result),
+//                 Err(e) => eprintln!("Script error: {}", e),
+//             }
+//         }
+//     }
+//     Ok(())
+// }
 
 fn extract_css(node: &dom::Node) -> String {
     let mut css = String::new();
