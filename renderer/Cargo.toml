@@ -1,0 +1,29 @@
+[package]
+name = "renderer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+shared = { path = "../shared" }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+
+# JavaScript engine
+rquickjs = { version = "0.6", features = ["array-buffer", "classes"] }
+
+# Image decoding
+image = "0.25"
+reqwest = { version = "0.12", features = ["blocking"] }
+base64 = "0.22"
+
+# Font rendering
+fontdue = "0.9"
+
+# Better text handling
+unicode-segmentation = "1.11"
+regex = "1.10"
+
+[[bin]]
+name = "renderer"
+path = "src/main.rs"

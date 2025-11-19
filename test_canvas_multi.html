@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Test - Multiple Canvases</title>
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #666;
+            font-size: 18px;
+        }
+        .canvas-container {
+            background-color: white;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        canvas {
+            border: 2px solid #333;
+            display: block;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Canvas 2D API Test - Multiple Canvases</h1>
+
+    <div class="canvas-container">
+        <h2>Canvas 1: 400x300</h2>
+        <canvas id="demo1" width="400" height="300"></canvas>
+    </div>
+
+    <div class="canvas-container">
+        <h2>Canvas 2: 200x150</h2>
+        <canvas id="demo2" width="200" height="150"></canvas>
+    </div>
+
+    <div class="canvas-container">
+        <h2>Canvas 3: 600x200</h2>
+        <canvas id="demo3" width="600" height="200"></canvas>
+    </div>
+
+    <p>Each canvas element renders demo graphics with rectangles and triangle paths.</p>
+</body>
+</html>

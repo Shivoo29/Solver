@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+        }
+
+        .flex-container {
+            display: flex;
+            background-color: lightgray;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        .flex-row {
+            flex-direction: row;
+        }
+
+        .flex-column {
+            flex-direction: column;
+        }
+
+        .justify-center {
+            justify-content: center;
+        }
+
+        .justify-space-between {
+            justify-content: space-between;
+        }
+
+        .align-center {
+            align-items: center;
+        }
+
+        .flex-item {
+            background-color: lightblue;
+            padding: 10px;
+            margin: 5px;
+        }
+
+        h2 {
+            color: darkblue;
+        }
+    </style>
+</head>
+<body>
+    <h2>Flexbox Row Layout</h2>
+    <div class="flex-container flex-row">
+        <div class="flex-item">Item 1</div>
+        <div class="flex-item">Item 2</div>
+        <div class="flex-item">Item 3</div>
+    </div>
+
+    <h2>Flexbox Row - Centered</h2>
+    <div class="flex-container flex-row justify-center">
+        <div class="flex-item">Item A</div>
+        <div class="flex-item">Item B</div>
+        <div class="flex-item">Item C</div>
+    </div>
+
+    <h2>Flexbox Row - Space Between</h2>
+    <div class="flex-container flex-row justify-space-between">
+        <div class="flex-item">Left</div>
+        <div class="flex-item">Middle</div>
+        <div class="flex-item">Right</div>
+    </div>
+
+    <h2>Flexbox Column Layout</h2>
+    <div class="flex-container flex-column">
+        <div class="flex-item">Top</div>
+        <div class="flex-item">Middle</div>
+        <div class="flex-item">Bottom</div>
+    </div>
+</body>
+</html>

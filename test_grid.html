@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: 200px 1fr 2fr;
+            grid-template-rows: 100px 150px;
+            gap: 10px;
+            background-color: lightgray;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        .grid-auto {
+            display: grid;
+            gap: 15px;
+            background-color: lightgray;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        .grid-item {
+            background-color: lightblue;
+            padding: 15px;
+        }
+
+        .item1 { background-color: coral; }
+        .item2 { background-color: lightgreen; }
+        .item3 { background-color: lightyellow; }
+        .item4 { background-color: lightpink; }
+        .item5 { background-color: lightcyan; }
+        .item6 { background-color: lavender; }
+
+        h2 {
+            color: darkblue;
+        }
+    </style>
+</head>
+<body>
+    <h2>CSS Grid Layout with Template</h2>
+    <div class="grid-container">
+        <div class="grid-item item1">Item 1 (200px)</div>
+        <div class="grid-item item2">Item 2 (1fr)</div>
+        <div class="grid-item item3">Item 3 (2fr)</div>
+        <div class="grid-item item4">Item 4</div>
+        <div class="grid-item item5">Item 5</div>
+        <div class="grid-item item6">Item 6</div>
+    </div>
+
+    <h2>CSS Grid Auto Layout (2 columns)</h2>
+    <div class="grid-auto">
+        <div class="grid-item item1">Auto 1</div>
+        <div class="grid-item item2">Auto 2</div>
+        <div class="grid-item item3">Auto 3</div>
+        <div class="grid-item item4">Auto 4</div>
+    </div>
+</body>
+</html>
