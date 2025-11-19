@@ -7,6 +7,7 @@ mod style;
 mod js_engine;
 mod images;
 mod fonts;
+mod page_state;
 
 use anyhow::Result;
 use shared::{BrowserMessage, RendererMessage};
@@ -19,7 +20,10 @@ fn main() -> Result<()> {
     send_message(&RendererMessage::Ready)?;
 
     let stdin = io::stdin();
-    let mut stdout = io::stdout();
+    let mut _stdout = io::stdout();
+
+    // Track current page state
+    let mut current_page: Option<page_state::PageState> = None;
 
     for line in stdin.lock().lines() {
         let line = line?;
@@ -33,7 +37,10 @@ fn main() -> Result<()> {
             }) => {
                 eprintln!("Rendering: {} ({}x{})", url, width, height);
 
-                match render_html(&html, width, height) {
+                // Create new page state
+                current_page = Some(page_state::PageState::new(url.clone(), html.clone(), width, height));
+
+                match render_page_state(&current_page.as_ref().unwrap()) {
                     Ok(pixels) => {
                         let message = RendererMessage::FrameReady {
                             width,
@@ -51,6 +58,50 @@ fn main() -> Result<()> {
                     }
                 }
             }
+            Ok(BrowserMessage::MouseClick { x, y }) => {
+                eprintln!("Mouse click: ({}, {})", x, y);
+
+                if let Some(ref mut page) = current_page {
+                    // Need to re-render to get layout tree for hit testing
+                    match render_and_handle_click(page, x, y) {
+                        Ok((changed, pixels)) => {
+                            if changed {
+                                let message = RendererMessage::FrameReady {
+                                    width: page.width,
+                                    height: page.height,
+                                    pixels,
+                                };
+                                send_message(&message)?;
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Click handling error: {}", e);
+                        }
+                    }
+                }
+            }
+            Ok(BrowserMessage::KeyPress { key }) => {
+                eprintln!("Key press: {:?}", key);
+
+                if let Some(ref mut page) = current_page {
+                    let changed = page.handle_key(&key);
+                    if changed {
+                        match render_page_state(page) {
+                            Ok(pixels) => {
+                                let message = RendererMessage::FrameReady {
+                                    width: page.width,
+                                    height: page.height,
+                                    pixels,
+                                };
+                                send_message(&message)?;
+                            }
+                            Err(e) => {
+                                eprintln!("Re-render error: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
             Ok(BrowserMessage::Shutdown) => {
                 eprintln!("Renderer shutting down");
                 break;
@@ -64,10 +115,10 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn render_html(html: &str, width: u32, height: u32) -> Result<Vec<u8>> {
+fn render_page_state(page: &page_state::PageState) -> Result<Vec<u8>> {
     // Parse HTML
     eprintln!("Parsing HTML...");
-    let dom = html_parser::HtmlParser::parse(html.to_string());
+    let dom = html_parser::HtmlParser::parse(page.html.clone());
 
     // Execute JavaScript
     eprintln!("Executing JavaScript...");
@@ -82,22 +133,67 @@ fn render_html(html: &str, width: u32, height: u32) -> Result<Vec<u8>> {
     eprintln!("Building style tree...");
     let styled_root = style::style_tree(&dom, &stylesheet);
 
-    // Build layout tree
+    // Build layout tree (with form values from page state)
     eprintln!("Computing layout...");
     let mut viewport = layout::Dimensions::default();
-    viewport.content.width = width as f32;
-    viewport.content.height = height as f32;
+    viewport.content.width = page.width as f32;
+    viewport.content.height = page.height as f32;
 
     // Create image cache for loading images
     let image_cache = images::ImageCache::new();
-    let layout_root = layout::layout_tree(&styled_root, viewport, &image_cache);
+    let layout_root = layout::layout_tree(
+        &styled_root,
+        viewport,
+        &image_cache,
+        Some(&page.form_values),
+    );
 
-    // Render to canvas
+    // Render to canvas (with focus state)
     eprintln!("Rendering to canvas...");
-    let canvas = render::render(&layout_root, width as usize, height as usize);
+    let canvas = render::render(
+        &layout_root,
+        page.width as usize,
+        page.height as usize,
+        page.focused_input,
+        page.cursor_position,
+    );
 
     eprintln!("Render complete!");
     Ok(canvas.pixels)
+}
+
+fn render_and_handle_click(page: &mut page_state::PageState, x: f32, y: f32) -> Result<(bool, Vec<u8>)> {
+    // Parse HTML and build layout to get hit test
+    let dom = html_parser::HtmlParser::parse(page.html.clone());
+    let css = extract_css(&dom);
+    let stylesheet = css_parser::CssParser::parse(css);
+    let styled_root = style::style_tree(&dom, &stylesheet);
+
+    let mut viewport = layout::Dimensions::default();
+    viewport.content.width = page.width as f32;
+    viewport.content.height = page.height as f32;
+
+    let image_cache = images::ImageCache::new();
+    let layout_root = layout::layout_tree(
+        &styled_root,
+        viewport,
+        &image_cache,
+        Some(&page.form_values),
+    );
+
+    // Handle the click
+    let changed = page.handle_click(&layout_root, x, y);
+
+    // Re-render with updated state
+    let canvas = render::render(
+        &layout_root,
+        page.width as usize,
+        page.height as usize,
+        page.focused_input,
+        page.cursor_position,
+    );
+
+    Ok((changed, canvas.pixels))
 }
 
 fn execute_javascript(dom: &dom::Node) -> Result<()> {

@@ -10,8 +10,37 @@ pub enum BrowserMessage {
         width: u32,
         height: u32,
     },
+    /// Mouse click event
+    MouseClick {
+        x: f32,
+        y: f32,
+    },
+    /// Key press event
+    KeyPress {
+        key: KeyEvent,
+    },
     /// Shutdown the renderer
     Shutdown,
+}
+
+/// Keyboard event types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum KeyEvent {
+    /// Regular character input
+    Char(char),
+    /// Backspace key
+    Backspace,
+    /// Delete key
+    Delete,
+    /// Enter/Return key
+    Enter,
+    /// Tab key
+    Tab,
+    /// Arrow keys
+    ArrowLeft,
+    ArrowRight,
+    ArrowUp,
+    ArrowDown,
 }
 
 /// Messages sent from renderer process to browser process

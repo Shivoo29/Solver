@@ -9,6 +9,8 @@ pub struct Canvas {
     pub width: usize,
     pub height: usize,
     font_cache: FontCache,
+    focused_input: Option<usize>,
+    cursor_position: usize,
 }
 
 impl Canvas {
@@ -19,7 +21,14 @@ impl Canvas {
             width,
             height,
             font_cache: FontCache::new(),
+            focused_input: None,
+            cursor_position: 0,
         }
+    }
+
+    pub fn set_focus_state(&mut self, focused_input: Option<usize>, cursor_position: usize) {
+        self.focused_input = focused_input;
+        self.cursor_position = cursor_position;
     }
 
     pub fn paint_item(&mut self, layout_box: &LayoutBox) {
@@ -170,9 +179,17 @@ impl Canvas {
     fn render_form_element(&mut self, layout_box: &LayoutBox, form_data: &FormElementData) {
         let rect = layout_box.dimensions.content;
 
-        // Draw form element border
-        let border_color = Color { r: 128, g: 128, b: 128, a: 255 };
-        self.draw_rect_outline(rect, border_color, 1.0);
+        // Check if this input is focused
+        let is_focused = form_data.input_index.map_or(false, |idx| self.focused_input == Some(idx));
+
+        // Draw form element border (blue if focused, gray otherwise)
+        let border_color = if is_focused {
+            Color { r: 0, g: 120, b: 215, a: 255 } // Blue focus border
+        } else {
+            Color { r: 128, g: 128, b: 128, a: 255 } // Gray border
+        };
+        let border_thickness = if is_focused { 2.0 } else { 1.0 };
+        self.draw_rect_outline(rect, border_color, border_thickness);
 
         // Draw form element background (white for inputs, light gray for buttons)
         let bg_color = match form_data.element_type {
@@ -182,11 +199,12 @@ impl Canvas {
         };
 
         // Fill background (slightly inset from border)
+        let inset = border_thickness;
         let fill_rect = Rect {
-            x: rect.x + 1.0,
-            y: rect.y + 1.0,
-            width: rect.width - 2.0,
-            height: rect.height - 2.0,
+            x: rect.x + inset,
+            y: rect.y + inset,
+            width: rect.width - 2.0 * inset,
+            height: rect.height - 2.0 * inset,
         };
         self.paint_rect(fill_rect, bg_color);
 
@@ -194,13 +212,13 @@ impl Canvas {
         match form_data.element_type {
             FormElementType::TextInput | FormElementType::Password |
             FormElementType::Email | FormElementType::Number => {
-                self.render_input_field(rect, form_data);
+                self.render_input_field(rect, form_data, is_focused);
             }
             FormElementType::Button | FormElementType::Submit => {
                 self.render_button(rect, form_data);
             }
             FormElementType::Textarea => {
-                self.render_textarea(rect, form_data);
+                self.render_textarea(rect, form_data, is_focused);
             }
             FormElementType::Checkbox => {
                 self.render_checkbox(rect, form_data);
@@ -211,7 +229,7 @@ impl Canvas {
         }
     }
 
-    fn render_input_field(&mut self, rect: Rect, form_data: &FormElementData) {
+    fn render_input_field(&mut self, rect: Rect, form_data: &FormElementData, is_focused: bool) {
         let text_color = Color { r: 0, g: 0, b: 0, a: 255 };
         let placeholder_color = Color { r: 150, g: 150, b: 150, a: 255 };
 
@@ -227,15 +245,34 @@ impl Canvas {
             String::new()
         };
 
+        let text_x = rect.x + 8.0;
+        let text_y = rect.y + 6.0;
+
+        // Render text if present
         if !display_text.is_empty() {
             let color = if form_data.value.is_empty() { placeholder_color } else { text_color };
             let text_rect = Rect {
-                x: rect.x + 8.0,
-                y: rect.y + 6.0,
+                x: text_x,
+                y: text_y,
                 width: rect.width - 16.0,
                 height: rect.height - 12.0,
             };
             self.render_with_fonts(&display_text, text_rect, color, 14.0);
+        }
+
+        // Draw cursor if focused
+        if is_focused {
+            // Calculate cursor position based on character count
+            // Approximate: each char is ~8px wide
+            let char_width = 8.0;
+            let cursor_x = text_x + (self.cursor_position.min(form_data.value.len()) as f32 * char_width);
+            let cursor_rect = Rect {
+                x: cursor_x,
+                y: rect.y + 4.0,
+                width: 1.0,
+                height: rect.height - 8.0,
+            };
+            self.paint_rect(cursor_rect, text_color);
         }
     }
 
@@ -259,7 +296,7 @@ impl Canvas {
         self.render_with_fonts(&text, text_rect, text_color, 14.0);
     }
 
-    fn render_textarea(&mut self, rect: Rect, form_data: &FormElementData) {
+    fn render_textarea(&mut self, rect: Rect, form_data: &FormElementData, is_focused: bool) {
         let text_color = Color { r: 0, g: 0, b: 0, a: 255 };
         let placeholder_color = Color { r: 150, g: 150, b: 150, a: 255 };
 
@@ -271,15 +308,32 @@ impl Canvas {
             ""
         };
 
+        let text_x = rect.x + 8.0;
+        let text_y = rect.y + 6.0;
+
+        // Render text if present
         if !display_text.is_empty() {
             let color = if form_data.value.is_empty() { placeholder_color } else { text_color };
             let text_rect = Rect {
-                x: rect.x + 8.0,
-                y: rect.y + 6.0,
+                x: text_x,
+                y: text_y,
                 width: rect.width - 16.0,
                 height: rect.height - 12.0,
             };
             self.render_with_fonts(display_text, text_rect, color, 14.0);
+        }
+
+        // Draw cursor if focused (simplified - just draw at end of text for textarea)
+        if is_focused {
+            let char_width = 8.0;
+            let cursor_x = text_x + (self.cursor_position.min(form_data.value.len()) as f32 * char_width);
+            let cursor_rect = Rect {
+                x: cursor_x,
+                y: text_y,
+                width: 1.0,
+                height: 16.0,
+            };
+            self.paint_rect(cursor_rect, text_color);
         }
     }
 
@@ -502,8 +556,15 @@ fn get_text_content(node: &crate::dom::Node) -> String {
     text
 }
 
-pub fn render(layout_root: &LayoutBox, width: usize, height: usize) -> Canvas {
+pub fn render(
+    layout_root: &LayoutBox,
+    width: usize,
+    height: usize,
+    focused_input: Option<usize>,
+    cursor_position: usize,
+) -> Canvas {
     let mut canvas = Canvas::new(width, height);
+    canvas.set_focus_state(focused_input, cursor_position);
     canvas.paint_item(layout_root);
     canvas
 }

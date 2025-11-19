@@ -53,6 +53,7 @@ pub struct FormElementData {
     pub value: String,
     pub placeholder: String,
     pub name: String,
+    pub input_index: Option<usize>, // Index for tracking focus/state
 }
 
 #[derive(Debug)]
@@ -89,24 +90,33 @@ impl Rect {
     }
 }
 
+use std::collections::HashMap;
+
 pub fn layout_tree<'a>(
     node: &'a StyledNode<'a>,
     mut containing_block: Dimensions,
     image_cache: &ImageCache,
+    form_values: Option<&HashMap<usize, String>>,
 ) -> LayoutBox<'a> {
     containing_block.content.height = 0.0;
 
-    let mut root_box = build_layout_tree(node, image_cache);
+    let mut input_counter = 0;
+    let mut root_box = build_layout_tree(node, image_cache, form_values, &mut input_counter);
     root_box.layout(containing_block);
     root_box
 }
 
-fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>, image_cache: &ImageCache) -> LayoutBox<'a> {
+fn build_layout_tree<'a>(
+    style_node: &'a StyledNode<'a>,
+    image_cache: &ImageCache,
+    form_values: Option<&HashMap<usize, String>>,
+    input_counter: &mut usize,
+) -> LayoutBox<'a> {
     // Check if this is a form element, image, or regular element
     let box_type = if let NodeType::Element(elem) = &style_node.node.node_type {
         // Check for form elements first
         if elem.tag_name == "input" || elem.tag_name == "button" || elem.tag_name == "textarea" {
-            let form_data = create_form_element_data(elem);
+            let form_data = create_form_element_data(elem, form_values, input_counter);
             BoxType::FormElement(style_node, form_data)
         } else if elem.tag_name == "img" {
             // Try to load the image
@@ -146,11 +156,11 @@ fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>, image_cache: &ImageCach
 
     for child in &style_node.children {
         match child.display().display_type {
-            DisplayType::Block => root.children.push(build_layout_tree(child, image_cache)),
+            DisplayType::Block => root.children.push(build_layout_tree(child, image_cache, form_values, input_counter)),
             DisplayType::Inline => root
                 .get_inline_container()
                 .children
-                .push(build_layout_tree(child, image_cache)),
+                .push(build_layout_tree(child, image_cache, form_values, input_counter)),
             DisplayType::None => {}
         }
     }
@@ -158,7 +168,11 @@ fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>, image_cache: &ImageCach
     root
 }
 
-fn create_form_element_data(elem: &crate::dom::ElementData) -> FormElementData {
+fn create_form_element_data(
+    elem: &crate::dom::ElementData,
+    form_values: Option<&HashMap<usize, String>>,
+    input_counter: &mut usize,
+) -> FormElementData {
     let element_type = if elem.tag_name == "button" {
         let button_type = elem.attributes.get("type").map(|s| s.as_str()).unwrap_or("submit");
         match button_type {
@@ -182,15 +196,36 @@ fn create_form_element_data(elem: &crate::dom::ElementData) -> FormElementData {
         }
     };
 
-    let value = elem.attributes.get("value").cloned().unwrap_or_default();
+    // Determine if this input can be focused and assign index
+    let (input_index, current_value) = if matches!(element_type,
+        FormElementType::TextInput | FormElementType::Password |
+        FormElementType::Email | FormElementType::Number | FormElementType::Textarea) {
+
+        let index = *input_counter;
+        *input_counter += 1;
+
+        // Use form_values if available, otherwise use HTML attribute
+        let value = form_values
+            .and_then(|values| values.get(&index))
+            .cloned()
+            .or_else(|| elem.attributes.get("value").cloned())
+            .unwrap_or_default();
+
+        (Some(index), value)
+    } else {
+        // Non-focusable inputs (buttons, etc.) just use the value attribute
+        (None, elem.attributes.get("value").cloned().unwrap_or_default())
+    };
+
     let placeholder = elem.attributes.get("placeholder").cloned().unwrap_or_default();
     let name = elem.attributes.get("name").cloned().unwrap_or_default();
 
     FormElementData {
         element_type,
-        value,
+        value: current_value,
         placeholder,
         name,
+        input_index,
     }
 }
 
