@@ -113,7 +113,32 @@ impl CssParser {
     fn parse_selectors(&mut self) -> Vec<Selector> {
         let mut selectors = Vec::new();
         loop {
-            selectors.push(Selector::Simple(self.parse_simple_selector()));
+            let selector = self.parse_simple_selector();
+
+            // Skip attribute selectors and pseudo-classes by consuming until , or {
+            while !self.eof() && self.next_char() != ',' && self.next_char() != '{' {
+                if self.next_char() == '[' {
+                    // Skip attribute selector [...]
+                    self.consume_char(); // consume [
+                    self.consume_while(|c| c != ']');
+                    if self.next_char() == ']' {
+                        self.consume_char(); // consume ]
+                    }
+                } else if self.next_char() == ':' {
+                    // Skip pseudo-class :hover, :focus, etc
+                    self.consume_char(); // consume :
+                    self.parse_identifier(); // consume pseudo-class name
+                    // Handle ::before, ::after
+                    if self.next_char() == ':' {
+                        self.consume_char();
+                        self.parse_identifier();
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            selectors.push(Selector::Simple(selector));
             self.consume_whitespace();
             match self.next_char() {
                 ',' => {
@@ -121,7 +146,16 @@ impl CssParser {
                     self.consume_whitespace();
                 }
                 '{' => break,
-                c => panic!("Unexpected character {} in selector list", c),
+                _ => {
+                    // Skip to next selector or block start
+                    self.consume_while(|c| c != ',' && c != '{');
+                    if self.next_char() == ',' {
+                        self.consume_char();
+                        self.consume_whitespace();
+                    } else if self.next_char() == '{' {
+                        break;
+                    }
+                }
             }
         }
         // Sort by specificity (highest first)
@@ -167,15 +201,39 @@ impl CssParser {
                 self.consume_char();
                 break;
             }
-            declarations.push(self.parse_declaration());
+
+            // Try to parse declaration, skip if it fails
+            if let Some(decl) = self.try_parse_declaration() {
+                declarations.push(decl);
+            }
         }
         declarations
     }
 
-    fn parse_declaration(&mut self) -> Declaration {
+    fn try_parse_declaration(&mut self) -> Option<Declaration> {
         let property_name = self.parse_identifier();
+        if property_name.is_empty() {
+            // Skip to next semicolon or }
+            self.consume_while(|c| c != ';' && c != '}');
+            if self.next_char() == ';' {
+                self.consume_char();
+            }
+            return None;
+        }
+
         self.consume_whitespace();
-        assert_eq!(self.consume_char(), ':');
+
+        // Check for colon
+        if self.next_char() != ':' {
+            // Skip malformed declaration
+            self.consume_while(|c| c != ';' && c != '}');
+            if self.next_char() == ';' {
+                self.consume_char();
+            }
+            return None;
+        }
+
+        self.consume_char(); // consume ':'
         self.consume_whitespace();
         let value = self.parse_value();
         self.consume_whitespace();
@@ -183,18 +241,44 @@ impl CssParser {
             self.consume_char();
         }
 
-        Declaration {
+        Some(Declaration {
             name: property_name,
             value,
-        }
+        })
     }
 
     fn parse_value(&mut self) -> Value {
+        // Try to parse simple values first
         match self.next_char() {
-            '0'..='9' => self.parse_length(),
-            '#' => self.parse_color(),
-            _ => Value::Keyword(self.parse_identifier()),
+            '#' => {
+                // Hex color
+                return self.parse_color();
+            }
+            '0'..='9' => {
+                // Could be a length or part of a complex value
+                // Try to parse as length if it's just "123px" format
+                let start_pos = self.pos;
+                let num = self.parse_float();
+                let unit_str = self.parse_identifier().to_lowercase();
+
+                // If it's a simple length, return it
+                if (unit_str == "px" || unit_str == "") && (self.next_char() == ';' || self.next_char() == '}') {
+                    let unit = match unit_str.as_str() {
+                        "px" | "" => Unit::Px,
+                        _ => Unit::Px, // Default to px
+                    };
+                    return Value::Length(num, unit);
+                }
+
+                // Otherwise, it's part of a complex value - reset and parse as keyword
+                self.pos = start_pos;
+            }
+            _ => {}
         }
+
+        // For everything else (complex values, functions, etc), consume until ; or }
+        let value_str = self.consume_while(|c| c != ';' && c != '}').trim().to_string();
+        Value::Keyword(value_str)
     }
 
     fn parse_length(&mut self) -> Value {
