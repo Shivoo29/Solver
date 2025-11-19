@@ -10,6 +10,7 @@ members = [
     "solver-std-plugins/javascript",
     "solver-std-plugins/networking",
     "solver-std-plugins/ai-assistant",
+    "solver-std-plugins/privacy-sandbox",
 
     # Demo browser
     "solver-demo",

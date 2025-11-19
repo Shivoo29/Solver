@@ -15,6 +15,7 @@ solver-rendering-plugin = { path = "../solver-std-plugins/rendering" }
 solver-javascript-plugin = { path = "../solver-std-plugins/javascript" }
 solver-networking-plugin = { path = "../solver-std-plugins/networking" }
 solver-ai-assistant = { path = "../solver-std-plugins/ai-assistant" }
+solver-privacy-sandbox = { path = "../solver-std-plugins/privacy-sandbox" }
 
 anyhow = "1.0"
 tokio = { version = "1.40", features = ["full"] }

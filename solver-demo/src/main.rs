@@ -1,4 +1,5 @@
 mod ai_demo;
+mod privacy_demo;
 
 use anyhow::Result;
 use clap::Parser;
@@ -21,6 +22,10 @@ struct Args {
     /// Run AI assistant demo instead
     #[arg(long)]
     ai_demo: bool,
+
+    /// Run privacy sandbox demo
+    #[arg(long)]
+    privacy_demo: bool,
 }
 
 #[tokio::main]
@@ -32,8 +37,13 @@ async fn main() -> Result<()> {
         return ai_demo::run_ai_demo().await;
     }
 
-    // Require URL if not running AI demo
-    let url = args.url.ok_or_else(|| anyhow::anyhow!("URL required (or use --ai-demo)"))?;
+    // Run privacy demo if requested
+    if args.privacy_demo {
+        return privacy_demo::run_privacy_demo().await;
+    }
+
+    // Require URL if not running demo
+    let url = args.url.ok_or_else(|| anyhow::anyhow!("URL required (or use --ai-demo or --privacy-demo)"))?;
 
     println!("Solver Browser - Plugin Architecture Demo");
     println!("=========================================\n");
