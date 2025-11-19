@@ -2853,6 +2853,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "solver-ai-assistant"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "solver-core",
+ "solver-plugins",
+ "tokio",
+]
+
+[[package]]
 name = "solver-core"
 version = "0.1.0"
 dependencies = [
@@ -2870,6 +2884,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "solver-ai-assistant",
  "solver-core",
  "solver-javascript-plugin",
  "solver-networking-plugin",

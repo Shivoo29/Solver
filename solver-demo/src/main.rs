@@ -1,3 +1,5 @@
+mod ai_demo;
+
 use anyhow::Result;
 use clap::Parser;
 use solver_core::{BrowserCore, BrowserEvent, PluginPriority};
@@ -9,17 +11,29 @@ use solver_javascript_plugin::JavaScriptPlugin;
 #[command(name = "Solver Browser Demo")]
 #[command(about = "Demonstrating the plugin architecture", long_about = None)]
 struct Args {
-    /// URL to load
-    url: String,
+    /// URL to load (or use --ai-demo for AI assistant demo)
+    url: Option<String>,
 
     /// Output PNG file
     #[arg(short, long, default_value = "output.png")]
     output: String,
+
+    /// Run AI assistant demo instead
+    #[arg(long)]
+    ai_demo: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+
+    // Run AI demo if requested
+    if args.ai_demo {
+        return ai_demo::run_ai_demo().await;
+    }
+
+    // Require URL if not running AI demo
+    let url = args.url.ok_or_else(|| anyhow::anyhow!("URL required (or use --ai-demo)"))?;
 
     println!("Solver Browser - Plugin Architecture Demo");
     println!("=========================================\n");
@@ -55,16 +69,16 @@ async fn main() -> Result<()> {
         println!("  - {}", plugin);
     }
 
-    println!("\nLoading URL: {}", args.url);
+    println!("\nLoading URL: {}", url);
 
     // Emit navigation event
     core.emit_event(BrowserEvent::NavigationRequested {
-        url: args.url.clone()
+        url: url.clone()
     });
 
     // Emit page load start
     core.emit_event(BrowserEvent::PageLoadStart {
-        url: args.url.clone()
+        url: url.clone()
     });
 
     // Process all events
