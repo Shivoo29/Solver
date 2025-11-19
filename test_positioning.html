@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: lightgray;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .box {
+            width: 100px;
+            height: 100px;
+            background-color: lightblue;
+            margin: 10px;
+            padding: 10px;
+        }
+
+        .relative {
+            position: relative;
+            top: 20px;
+            left: 30px;
+            background-color: lightgreen;
+        }
+
+        .absolute {
+            position: absolute;
+            top: 150px;
+            left: 200px;
+            background-color: coral;
+        }
+
+        .fixed {
+            position: fixed;
+            top: 50px;
+            left: 500px;
+            background-color: lightyellow;
+        }
+
+        h2 {
+            color: darkblue;
+        }
+    </style>
+</head>
+<body>
+    <h2>CSS Positioning Demo</h2>
+
+    <div class="container">
+        <div class="box">Static (normal)</div>
+        <div class="box relative">Relative (offset +20px top, +30px left)</div>
+        <div class="box">Another static box</div>
+    </div>
+
+    <div class="box absolute">Absolute (top: 150px, left: 200px)</div>
+
+    <div class="box fixed">Fixed (top: 50px, left: 500px)</div>
+
+    <h2>More content below</h2>
+    <p>This text appears after the positioned elements.</p>
+</body>
+</html>

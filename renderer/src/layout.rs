@@ -1,5 +1,5 @@
 use crate::css_parser::{Unit, Value};
-use crate::style::{DisplayType, StyledNode, FlexDirection, JustifyContent, AlignItems, GridTrackSize};
+use crate::style::{DisplayType, StyledNode, FlexDirection, JustifyContent, AlignItems, GridTrackSize, Position};
 use crate::images::{ImageData, ImageCache};
 use crate::dom::NodeType;
 
@@ -108,6 +108,10 @@ pub fn layout_tree<'a>(
     let mut input_counter = 0;
     let mut root_box = build_layout_tree(node, image_cache, form_values, &mut input_counter);
     root_box.layout(containing_block);
+
+    // Apply CSS positioning after normal layout
+    root_box.apply_positioning();
+
     root_box
 }
 
@@ -907,6 +911,55 @@ impl<'a> LayoutBox<'a> {
             BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
             BoxType::TableCellNode(node) | BoxType::FlexNode(node) | BoxType::GridNode(node) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block has no style node"),
+        }
+    }
+
+    fn apply_positioning(&mut self) {
+        // Apply positioning to this box
+        if let Some(style) = self.try_get_style_node() {
+            let position = style.position();
+
+            match position {
+                Position::Static => {
+                    // No positioning adjustments
+                }
+                Position::Relative => {
+                    // Offset from normal position
+                    if let Some(top) = style.top() {
+                        self.dimensions.content.y += top;
+                    }
+                    if let Some(left) = style.left() {
+                        self.dimensions.content.x += left;
+                    }
+                    // Note: bottom and right would require calculating from container
+                }
+                Position::Absolute | Position::Fixed => {
+                    // For absolute/fixed, override position entirely
+                    // Note: This is a simplified implementation
+                    // Full implementation would find containing block or viewport
+
+                    if let Some(top) = style.top() {
+                        self.dimensions.content.y = top;
+                    }
+                    if let Some(left) = style.left() {
+                        self.dimensions.content.x = left;
+                    }
+                }
+            }
+        }
+
+        // Recursively apply to children
+        for child in &mut self.children {
+            child.apply_positioning();
+        }
+    }
+
+    fn try_get_style_node(&self) -> Option<&'a StyledNode<'a>> {
+        match self.box_type {
+            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) |
+            BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
+            BoxType::TableCellNode(node) | BoxType::FlexNode(node) | BoxType::GridNode(node) => Some(node),
+            BoxType::AnonymousBlock => None,
         }
     }
 }

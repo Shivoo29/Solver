@@ -188,6 +188,74 @@ impl<'a> StyledNode<'a> {
         }
     }
 
+    // Float property
+    pub fn float(&self) -> Float {
+        match self.value("float") {
+            Some(Value::Keyword(s)) => match s.as_str() {
+                "left" => Float::Left,
+                "right" => Float::Right,
+                "none" => Float::None,
+                _ => Float::None,
+            },
+            _ => Float::None,
+        }
+    }
+
+    pub fn clear(&self) -> Clear {
+        match self.value("clear") {
+            Some(Value::Keyword(s)) => match s.as_str() {
+                "left" => Clear::Left,
+                "right" => Clear::Right,
+                "both" => Clear::Both,
+                "none" => Clear::None,
+                _ => Clear::None,
+            },
+            _ => Clear::None,
+        }
+    }
+
+    // Position properties
+    pub fn position(&self) -> Position {
+        match self.value("position") {
+            Some(Value::Keyword(s)) => match s.as_str() {
+                "static" => Position::Static,
+                "relative" => Position::Relative,
+                "absolute" => Position::Absolute,
+                "fixed" => Position::Fixed,
+                _ => Position::Static,
+            },
+            _ => Position::Static,
+        }
+    }
+
+    pub fn top(&self) -> Option<f32> {
+        match self.value("top") {
+            Some(Value::Length(n, Unit::Px)) => Some(n),
+            _ => None,
+        }
+    }
+
+    pub fn right(&self) -> Option<f32> {
+        match self.value("right") {
+            Some(Value::Length(n, Unit::Px)) => Some(n),
+            _ => None,
+        }
+    }
+
+    pub fn bottom(&self) -> Option<f32> {
+        match self.value("bottom") {
+            Some(Value::Length(n, Unit::Px)) => Some(n),
+            _ => None,
+        }
+    }
+
+    pub fn left(&self) -> Option<f32> {
+        match self.value("left") {
+            Some(Value::Length(n, Unit::Px)) => Some(n),
+            _ => None,
+        }
+    }
+
     // Flexbox properties
     pub fn flex_direction(&self) -> FlexDirection {
         match self.value("flex-direction") {
@@ -357,4 +425,29 @@ pub enum GridTrackSize {
     Px(f32),      // Fixed size in pixels
     Fr(f32),      // Fractional unit (share of remaining space)
     Auto,         // Auto-sized based on content
+}
+
+// Float enums
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Float {
+    Left,
+    Right,
+    None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Clear {
+    Left,
+    Right,
+    Both,
+    None,
+}
+
+// Position enums
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Position {
+    Static,    // Normal flow
+    Relative,  // Offset from normal position
+    Absolute,  // Positioned relative to nearest positioned ancestor
+    Fixed,     // Positioned relative to viewport
 }
