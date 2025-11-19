@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
 use shared::{BrowserMessage, RendererMessage};
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
+use std::fs;
 
 #[cfg(feature = "gui")]
 mod gui;
@@ -191,6 +192,19 @@ fn fetch_url(url: &str) -> Result<String> {
 </body>
 </html>
         "#.to_string());
+    }
+
+    // Handle local file paths
+    if url.starts_with('/') || url.starts_with("./") || url.starts_with("../") {
+        return fs::read_to_string(url)
+            .context(format!("Failed to read local file: {}", url));
+    }
+
+    // Handle file:// URLs
+    if url.starts_with("file://") {
+        let path = url.strip_prefix("file://").unwrap();
+        return fs::read_to_string(path)
+            .context(format!("Failed to read file: {}", path));
     }
 
     // Add http:// if no scheme

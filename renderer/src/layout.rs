@@ -1,6 +1,7 @@
 use crate::css_parser::{Unit, Value};
 use crate::style::{DisplayType, StyledNode, FlexDirection, JustifyContent, AlignItems, GridTrackSize, Position};
 use crate::images::{ImageData, ImageCache};
+use crate::canvas::CanvasRenderingContext2D;
 use crate::dom::NodeType;
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -56,12 +57,20 @@ pub struct FormElementData {
     pub input_index: Option<usize>, // Index for tracking focus/state
 }
 
+#[derive(Debug, Clone)]
+pub struct CanvasData {
+    pub id: String,
+    pub width: u32,
+    pub height: u32,
+}
+
 #[derive(Debug)]
 pub enum BoxType<'a> {
     BlockNode(&'a StyledNode<'a>),
     InlineNode(&'a StyledNode<'a>),
     ImageNode(&'a StyledNode<'a>, Option<ImageData>),
     FormElement(&'a StyledNode<'a>, FormElementData),
+    CanvasNode(&'a StyledNode<'a>, CanvasData),
     TableNode(&'a StyledNode<'a>),
     TableRowNode(&'a StyledNode<'a>),
     TableCellNode(&'a StyledNode<'a>),
@@ -146,6 +155,18 @@ fn build_layout_tree<'a>(
                 });
 
             BoxType::ImageNode(style_node, image_data)
+        } else if elem.tag_name == "canvas" {
+            // Create canvas element
+            let id = elem.attributes.get("id").cloned().unwrap_or_else(|| "canvas".to_string());
+            let width = elem.attributes.get("width")
+                .and_then(|w| w.parse::<u32>().ok())
+                .unwrap_or(300);
+            let height = elem.attributes.get("height")
+                .and_then(|h| h.parse::<u32>().ok())
+                .unwrap_or(150);
+
+            let canvas_data = CanvasData { id, width, height };
+            BoxType::CanvasNode(style_node, canvas_data)
         } else {
             match style_node.display().display_type {
                 DisplayType::Block => BoxType::BlockNode(style_node),
@@ -261,7 +282,7 @@ impl<'a> LayoutBox<'a> {
 
     fn get_inline_container(&mut self) -> &mut LayoutBox<'a> {
         match self.box_type {
-            BoxType::InlineNode(_) | BoxType::AnonymousBlock | BoxType::ImageNode(_, _) | BoxType::FormElement(_, _) => self,
+            BoxType::InlineNode(_) | BoxType::AnonymousBlock | BoxType::ImageNode(_, _) | BoxType::FormElement(_, _) | BoxType::CanvasNode(_, _) => self,
             BoxType::BlockNode(_) | BoxType::TableNode(_) | BoxType::TableRowNode(_) | BoxType::TableCellNode(_) | BoxType::FlexNode(_) | BoxType::GridNode(_) => {
                 match self.children.last() {
                     Some(&LayoutBox {
@@ -281,6 +302,7 @@ impl<'a> LayoutBox<'a> {
             BoxType::InlineNode(_) | BoxType::AnonymousBlock => self.layout_inline(containing_block),
             BoxType::ImageNode(_, _) => self.layout_image(containing_block),
             BoxType::FormElement(_, _) => self.layout_form_element(containing_block),
+            BoxType::CanvasNode(_, _) => self.layout_canvas(containing_block),
             BoxType::TableNode(_) => self.layout_table(containing_block),
             BoxType::TableRowNode(_) => self.layout_table_row(containing_block),
             BoxType::TableCellNode(_) => self.layout_table_cell(containing_block),
@@ -368,6 +390,22 @@ impl<'a> LayoutBox<'a> {
             // Default dimensions
             self.dimensions.content.width = 100.0;
             self.dimensions.content.height = 30.0;
+        }
+    }
+
+    fn layout_canvas(&mut self, containing_block: Dimensions) {
+        // Set position
+        self.dimensions.content.x = containing_block.content.x;
+        self.dimensions.content.y = containing_block.content.y + containing_block.content.height;
+
+        // Get canvas dimensions from canvas data
+        if let BoxType::CanvasNode(_, canvas_data) = &self.box_type {
+            self.dimensions.content.width = canvas_data.width as f32;
+            self.dimensions.content.height = canvas_data.height as f32;
+        } else {
+            // Default canvas dimensions (HTML standard default)
+            self.dimensions.content.width = 300.0;
+            self.dimensions.content.height = 150.0;
         }
     }
 
@@ -908,7 +946,7 @@ impl<'a> LayoutBox<'a> {
     fn get_style_node(&self) -> &'a StyledNode<'a> {
         match self.box_type {
             BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) |
-            BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
+            BoxType::FormElement(node, _) | BoxType::CanvasNode(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
             BoxType::TableCellNode(node) | BoxType::FlexNode(node) | BoxType::GridNode(node) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block has no style node"),
         }
@@ -957,7 +995,7 @@ impl<'a> LayoutBox<'a> {
     fn try_get_style_node(&self) -> Option<&'a StyledNode<'a>> {
         match self.box_type {
             BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) |
-            BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
+            BoxType::FormElement(node, _) | BoxType::CanvasNode(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
             BoxType::TableCellNode(node) | BoxType::FlexNode(node) | BoxType::GridNode(node) => Some(node),
             BoxType::AnonymousBlock => None,
         }

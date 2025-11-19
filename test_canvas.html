@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Test - Solver Browser</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        .canvas-container {
+            background-color: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        canvas {
+            border: 2px solid #333;
+            display: block;
+            margin: 10px 0;
+        }
+        p {
+            color: #666;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Canvas 2D API Test</h1>
+
+    <div class="canvas-container">
+        <h2>Demo Canvas 1: Basic Shapes</h2>
+        <p>This canvas demonstrates rectangles and paths (triangle).</p>
+        <canvas id="demo1" width="400" height="300"></canvas>
+    </div>
+
+    <div class="canvas-container">
+        <h2>Demo Canvas 2: Custom Size</h2>
+        <p>A smaller canvas with different dimensions.</p>
+        <canvas id="demo2" width="200" height="150"></canvas>
+    </div>
+
+    <div class="canvas-container">
+        <h2>Demo Canvas 3: Large Canvas</h2>
+        <p>Testing with a larger canvas element.</p>
+        <canvas id="demo3" width="600" height="400"></canvas>
+    </div>
+
+    <p><strong>Note:</strong> The canvas elements will render demo graphics showing the Canvas 2D API in action.</p>
+    <p>Each canvas should display blue rectangles and triangle shapes.</p>
+</body>
+</html>

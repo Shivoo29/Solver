@@ -8,6 +8,7 @@ mod js_engine;
 mod images;
 mod fonts;
 mod page_state;
+mod canvas;
 
 use anyhow::Result;
 use shared::{BrowserMessage, RendererMessage};

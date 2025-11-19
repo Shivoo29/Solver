@@ -1,12 +1,15 @@
 use anyhow::Result;
 use rquickjs::{Context, Runtime, Function, Object, CatchResultExt};
 use crate::dom::Node;
+use crate::canvas::{CanvasRenderingContext2D, parse_color_string};
 use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
 
 pub struct JavaScriptEngine {
     runtime: Runtime,
     context: Context,
     dom_root: Arc<Mutex<Option<Node>>>,
+    canvases: Arc<Mutex<HashMap<String, CanvasRenderingContext2D>>>,
 }
 
 impl JavaScriptEngine {
@@ -18,7 +21,17 @@ impl JavaScriptEngine {
             runtime,
             context,
             dom_root: Arc::new(Mutex::new(None)),
+            canvases: Arc::new(Mutex::new(HashMap::new())),
         })
+    }
+
+    pub fn create_canvas(&self, id: &str, width: u32, height: u32) {
+        let canvas = CanvasRenderingContext2D::new(width, height);
+        self.canvases.lock().unwrap().insert(id.to_string(), canvas);
+    }
+
+    pub fn get_canvas(&self, id: &str) -> Option<CanvasRenderingContext2D> {
+        self.canvases.lock().unwrap().get(id).cloned()
     }
 
     pub fn set_dom(&mut self, root: Node) {

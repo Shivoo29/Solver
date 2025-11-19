@@ -1,8 +1,10 @@
 use crate::css_parser::Color;
 use crate::dom::NodeType;
-use crate::layout::{BoxType, FormElementData, FormElementType, LayoutBox, Rect};
+use crate::layout::{BoxType, FormElementData, FormElementType, LayoutBox, Rect, CanvasData};
 use crate::fonts::FontCache;
 use crate::images::ImageData;
+use crate::canvas::CanvasRenderingContext2D;
+use std::collections::HashMap;
 
 pub struct Canvas {
     pub pixels: Vec<u8>,
@@ -42,6 +44,9 @@ impl Canvas {
             }
             BoxType::FormElement(_, form_data) => {
                 self.render_form_element(layout_box, form_data);
+            }
+            BoxType::CanvasNode(_, canvas_data) => {
+                self.render_canvas(layout_box, canvas_data);
             }
             _ => {
                 self.render_text(layout_box);
@@ -172,6 +177,57 @@ impl Canvas {
                     self.pixels[dest_offset + 2] = ((src_b as f32 * alpha) + (bg_b * inv_alpha)) as u8;
                     self.pixels[dest_offset + 3] = 255;
                 }
+            }
+        }
+    }
+
+    fn render_canvas(&mut self, layout_box: &LayoutBox, canvas_data: &CanvasData) {
+        let rect = layout_box.dimensions.content;
+
+        // Create a simple demo canvas with some graphics
+        let mut demo_canvas = CanvasRenderingContext2D::new(canvas_data.width, canvas_data.height);
+
+        // Demo: draw a gradient of rectangles
+        demo_canvas.set_fill_style(Color { r: 100, g: 150, b: 250, a: 255 });
+        demo_canvas.fill_rect(10.0, 10.0, 50.0, 50.0);
+
+        demo_canvas.set_fill_style(Color { r: 250, g: 100, b: 100, a: 255 });
+        demo_canvas.fill_rect(70.0, 10.0, 50.0, 50.0);
+
+        demo_canvas.set_stroke_style(Color { r: 50, g: 50, b: 50, a: 255 });
+        demo_canvas.set_line_width(2.0);
+        demo_canvas.stroke_rect(130.0, 10.0, 50.0, 50.0);
+
+        // Draw a simple path
+        demo_canvas.begin_path();
+        demo_canvas.move_to(20.0, 80.0);
+        demo_canvas.line_to(80.0, 80.0);
+        demo_canvas.line_to(50.0, 120.0);
+        demo_canvas.line_to(20.0, 80.0);
+        demo_canvas.set_fill_style(Color { r: 100, g: 200, b: 100, a: 255 });
+        demo_canvas.fill();
+
+        // Copy canvas pixels to main canvas
+        let canvas_pixels = demo_canvas.get_pixels();
+        let dest_x = rect.x as usize;
+        let dest_y = rect.y as usize;
+
+        for dy in 0..canvas_data.height as usize {
+            for dx in 0..canvas_data.width as usize {
+                let canvas_x = dest_x + dx;
+                let canvas_y = dest_y + dy;
+
+                if canvas_x >= self.width || canvas_y >= self.height {
+                    continue;
+                }
+
+                let src_offset = (dy * canvas_data.width as usize + dx) * 4;
+                let dest_offset = (canvas_y * self.width + canvas_x) * 4;
+
+                self.pixels[dest_offset] = canvas_pixels[src_offset];
+                self.pixels[dest_offset + 1] = canvas_pixels[src_offset + 1];
+                self.pixels[dest_offset + 2] = canvas_pixels[src_offset + 2];
+                self.pixels[dest_offset + 3] = canvas_pixels[src_offset + 3];
             }
         }
     }
@@ -387,7 +443,7 @@ impl Canvas {
     fn render_text(&mut self, layout_box: &LayoutBox) {
         let style_node = match layout_box.box_type {
             BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) |
-            BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
+            BoxType::FormElement(node, _) | BoxType::CanvasNode(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
             BoxType::TableCellNode(node) | BoxType::FlexNode(node) | BoxType::GridNode(node) => node,
             BoxType::AnonymousBlock => return,
         };
@@ -520,7 +576,7 @@ impl Canvas {
 fn get_background_color(layout_box: &LayoutBox) -> Option<Color> {
     match layout_box.box_type {
         BoxType::BlockNode(style_node) | BoxType::InlineNode(style_node) | BoxType::ImageNode(style_node, _) |
-        BoxType::FormElement(style_node, _) | BoxType::TableNode(style_node) | BoxType::TableRowNode(style_node) |
+        BoxType::FormElement(style_node, _) | BoxType::CanvasNode(style_node, _) | BoxType::TableNode(style_node) | BoxType::TableRowNode(style_node) |
         BoxType::TableCellNode(style_node) | BoxType::FlexNode(style_node) | BoxType::GridNode(style_node) => {
             style_node.background_color()
         }
@@ -531,7 +587,7 @@ fn get_background_color(layout_box: &LayoutBox) -> Option<Color> {
 fn get_border_color(layout_box: &LayoutBox) -> Option<Color> {
     match layout_box.box_type {
         BoxType::BlockNode(style_node) | BoxType::InlineNode(style_node) | BoxType::ImageNode(style_node, _) |
-        BoxType::FormElement(style_node, _) | BoxType::TableNode(style_node) | BoxType::TableRowNode(style_node) |
+        BoxType::FormElement(style_node, _) | BoxType::CanvasNode(style_node, _) | BoxType::TableNode(style_node) | BoxType::TableRowNode(style_node) |
         BoxType::TableCellNode(style_node) | BoxType::FlexNode(style_node) | BoxType::GridNode(style_node) => {
             style_node.value("border-color").and_then(|v| match v {
                 crate::css_parser::Value::Color(c) => Some(c),
