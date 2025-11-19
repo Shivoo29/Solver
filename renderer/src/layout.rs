@@ -62,6 +62,9 @@ pub enum BoxType<'a> {
     InlineNode(&'a StyledNode<'a>),
     ImageNode(&'a StyledNode<'a>, Option<ImageData>),
     FormElement(&'a StyledNode<'a>, FormElementData),
+    TableNode(&'a StyledNode<'a>),
+    TableRowNode(&'a StyledNode<'a>),
+    TableCellNode(&'a StyledNode<'a>),
     AnonymousBlock,
 }
 
@@ -141,6 +144,9 @@ fn build_layout_tree<'a>(
             match style_node.display().display_type {
                 DisplayType::Block => BoxType::BlockNode(style_node),
                 DisplayType::Inline => BoxType::InlineNode(style_node),
+                DisplayType::Table => BoxType::TableNode(style_node),
+                DisplayType::TableRow => BoxType::TableRowNode(style_node),
+                DisplayType::TableCell => BoxType::TableCellNode(style_node),
                 DisplayType::None => panic!("Root node has display: none"),
             }
         }
@@ -149,6 +155,7 @@ fn build_layout_tree<'a>(
             DisplayType::Block => BoxType::BlockNode(style_node),
             DisplayType::Inline => BoxType::InlineNode(style_node),
             DisplayType::None => panic!("Root node has display: none"),
+            _ => BoxType::InlineNode(style_node), // Text nodes with table display types become inline
         }
     };
 
@@ -161,6 +168,9 @@ fn build_layout_tree<'a>(
                 .get_inline_container()
                 .children
                 .push(build_layout_tree(child, image_cache, form_values, input_counter)),
+            DisplayType::Table | DisplayType::TableRow | DisplayType::TableCell => {
+                root.children.push(build_layout_tree(child, image_cache, form_values, input_counter))
+            }
             DisplayType::None => {}
         }
     }
@@ -241,7 +251,7 @@ impl<'a> LayoutBox<'a> {
     fn get_inline_container(&mut self) -> &mut LayoutBox<'a> {
         match self.box_type {
             BoxType::InlineNode(_) | BoxType::AnonymousBlock | BoxType::ImageNode(_, _) | BoxType::FormElement(_, _) => self,
-            BoxType::BlockNode(_) => {
+            BoxType::BlockNode(_) | BoxType::TableNode(_) | BoxType::TableRowNode(_) | BoxType::TableCellNode(_) => {
                 match self.children.last() {
                     Some(&LayoutBox {
                         box_type: BoxType::AnonymousBlock,
@@ -260,6 +270,9 @@ impl<'a> LayoutBox<'a> {
             BoxType::InlineNode(_) | BoxType::AnonymousBlock => self.layout_inline(containing_block),
             BoxType::ImageNode(_, _) => self.layout_image(containing_block),
             BoxType::FormElement(_, _) => self.layout_form_element(containing_block),
+            BoxType::TableNode(_) => self.layout_table(containing_block),
+            BoxType::TableRowNode(_) => self.layout_table_row(containing_block),
+            BoxType::TableCellNode(_) => self.layout_table_cell(containing_block),
         }
     }
 
@@ -342,6 +355,83 @@ impl<'a> LayoutBox<'a> {
             // Default dimensions
             self.dimensions.content.width = 100.0;
             self.dimensions.content.height = 30.0;
+        }
+    }
+
+    fn layout_table(&mut self, containing_block: Dimensions) {
+        // Simple table layout - treat like a block with auto width
+        self.dimensions.content.x = containing_block.content.x;
+        self.dimensions.content.y = containing_block.content.y + containing_block.content.height;
+        self.dimensions.content.width = containing_block.content.width;
+
+        // Layout all table rows
+        for child in &mut self.children {
+            child.layout(self.dimensions);
+            self.dimensions.content.height += child.dimensions.margin_box().height;
+        }
+    }
+
+    fn layout_table_row(&mut self, containing_block: Dimensions) {
+        // Table row spans full table width and arranges cells horizontally
+        self.dimensions.content.x = containing_block.content.x;
+        self.dimensions.content.y = containing_block.content.y + containing_block.content.height;
+        self.dimensions.content.width = containing_block.content.width;
+
+        // Count cells to determine width per cell
+        let cell_count = self.children.len();
+        if cell_count == 0 {
+            return;
+        }
+
+        let cell_width = containing_block.content.width / cell_count as f32;
+
+        // Layout cells side by side
+        let mut x_offset = self.dimensions.content.x;
+        let mut max_height = 0.0_f32;
+
+        for child in &mut self.children {
+            let mut cell_container = containing_block;
+            cell_container.content.x = x_offset;
+            cell_container.content.y = self.dimensions.content.y;
+            cell_container.content.width = cell_width;
+            cell_container.content.height = 0.0;
+
+            child.layout(cell_container);
+
+            x_offset += child.dimensions.margin_box().width;
+            max_height = max_height.max(child.dimensions.margin_box().height);
+        }
+
+        self.dimensions.content.height = max_height;
+    }
+
+    fn layout_table_cell(&mut self, containing_block: Dimensions) {
+        // Table cell uses block layout with some padding
+        self.dimensions.content.x = containing_block.content.x;
+        self.dimensions.content.y = containing_block.content.y;
+        self.dimensions.content.width = containing_block.content.width;
+
+        // Add default padding for cells
+        self.dimensions.padding.left = 5.0;
+        self.dimensions.padding.right = 5.0;
+        self.dimensions.padding.top = 5.0;
+        self.dimensions.padding.bottom = 5.0;
+
+        // Layout children
+        let adjusted_width = containing_block.content.width - 10.0; // Account for padding
+        let mut cell_block = containing_block;
+        cell_block.content.width = adjusted_width;
+        cell_block.content.height = 0.0;
+
+        for child in &mut self.children {
+            child.layout(cell_block);
+            self.dimensions.content.height += child.dimensions.margin_box().height;
+            cell_block.content.height = self.dimensions.content.height;
+        }
+
+        // Minimum height for empty cells
+        if self.dimensions.content.height < 20.0 {
+            self.dimensions.content.height = 20.0;
         }
     }
 
@@ -471,7 +561,9 @@ impl<'a> LayoutBox<'a> {
 
     fn get_style_node(&self) -> &'a StyledNode<'a> {
         match self.box_type {
-            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) | BoxType::FormElement(node, _) => node,
+            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) |
+            BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
+            BoxType::TableCellNode(node) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block has no style node"),
         }
     }

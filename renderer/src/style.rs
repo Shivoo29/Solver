@@ -21,6 +21,9 @@ pub enum DisplayType {
     Block,
     Inline,
     None,
+    Table,
+    TableRow,
+    TableCell,
 }
 
 impl Default for DisplayType {
@@ -124,14 +127,37 @@ impl<'a> StyledNode<'a> {
 
     pub fn display(&self) -> Display {
         match self.value("display") {
-            Some(Value::Keyword(s)) => Display {
-                display_type: match s.as_str() {
+            Some(Value::Keyword(s)) => {
+                let display_type = match s.as_str() {
                     "block" => DisplayType::Block,
+                    "inline" => DisplayType::Inline,
                     "none" => DisplayType::None,
-                    _ => DisplayType::Inline,
-                },
+                    "table" => DisplayType::Table,
+                    "table-row" => DisplayType::TableRow,
+                    "table-cell" => DisplayType::TableCell,
+                    _ => return Display { display_type: self.default_display_from_tag() },
+                };
+                Display { display_type }
             },
-            _ => Display::default(),
+            _ => Display { display_type: self.default_display_from_tag() },
+        }
+    }
+
+    fn default_display_from_tag(&self) -> DisplayType {
+        // Automatically assign display type based on HTML tag if no CSS display is set
+        if let NodeType::Element(ref elem) = self.node.node_type {
+            match elem.tag_name.as_str() {
+                "table" => DisplayType::Table,
+                "tr" => DisplayType::TableRow,
+                "td" | "th" => DisplayType::TableCell,
+                "div" | "section" | "article" | "header" | "footer" | "main" |
+                "nav" | "aside" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" |
+                "p" | "ul" | "ol" | "li" | "form" | "fieldset" => DisplayType::Block,
+                "span" | "a" | "strong" | "em" | "b" | "i" | "code" => DisplayType::Inline,
+                _ => DisplayType::Block,
+            }
+        } else {
+            DisplayType::Inline // Text nodes are inline
         }
     }
 
