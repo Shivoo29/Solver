@@ -11,6 +11,7 @@ members = [
     "solver-std-plugins/networking",
     "solver-std-plugins/ai-assistant",
     "solver-std-plugins/privacy-sandbox",
+    "solver-std-plugins/performance",
 
     # Demo browser
     "solver-demo",

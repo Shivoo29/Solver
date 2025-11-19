@@ -2947,6 +2947,7 @@ dependencies = [
  "solver-core",
  "solver-javascript-plugin",
  "solver-networking-plugin",
+ "solver-performance",
  "solver-plugins",
  "solver-privacy-sandbox",
  "solver-rendering-plugin",
@@ -2974,6 +2975,21 @@ dependencies = [
  "solver-core",
  "solver-plugins",
  "tokio",
+]
+
+[[package]]
+name = "solver-performance"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "solver-core",
+ "solver-plugins",
+ "tokio",
+ "url",
 ]
 
 [[package]]
