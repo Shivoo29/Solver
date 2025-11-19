@@ -4,7 +4,8 @@ use gdk_pixbuf::Pixbuf;
 use gtk::glib;
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, Box as GtkBox, Button, DrawingArea, Entry, Orientation};
-use shared::{BrowserMessage, RendererMessage};
+use gtk::{EventControllerKey, GestureClick};
+use shared::{BrowserMessage, KeyEvent, RendererMessage};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -88,6 +89,61 @@ fn build_ui(app: &Application) {
 
     window.set_child(Some(&vbox));
 
+    // Set up mouse click handling on drawing area
+    let click_gesture = GestureClick::new();
+    let state_clone = Arc::clone(&state);
+    let drawing_area_clone = drawing_area.clone();
+    click_gesture.connect_pressed(move |_gesture, _n_press, x, y| {
+        eprintln!("Click detected at ({}, {})", x, y);
+        let state = Arc::clone(&state_clone);
+        let drawing_area = drawing_area_clone.clone();
+
+        std::thread::spawn(move || {
+            if let Err(e) = handle_click(x as f32, y as f32, state, drawing_area) {
+                eprintln!("Click handling error: {}", e);
+            }
+        });
+    });
+    drawing_area.add_controller(click_gesture);
+
+    // Set up keyboard event handling on window
+    let key_controller = EventControllerKey::new();
+    let state_clone = Arc::clone(&state);
+    let drawing_area_clone = drawing_area.clone();
+    key_controller.connect_key_pressed(move |_controller, keyval, _keycode, _state| {
+        eprintln!("Key pressed: {:?}", keyval);
+
+        // Convert GTK keyval to our KeyEvent
+        let key_event = match keyval.name().as_ref().map(|s| s.as_str()) {
+            Some("BackSpace") => Some(KeyEvent::Backspace),
+            Some("Delete") => Some(KeyEvent::Delete),
+            Some("Return") | Some("KP_Enter") => Some(KeyEvent::Enter),
+            Some("Tab") => Some(KeyEvent::Tab),
+            Some("Left") => Some(KeyEvent::ArrowLeft),
+            Some("Right") => Some(KeyEvent::ArrowRight),
+            Some("Up") => Some(KeyEvent::ArrowUp),
+            Some("Down") => Some(KeyEvent::ArrowDown),
+            _ => {
+                // Try to get unicode character
+                keyval.to_unicode().map(KeyEvent::Char)
+            }
+        };
+
+        if let Some(key_event) = key_event {
+            let state = Arc::clone(&state_clone);
+            let drawing_area = drawing_area_clone.clone();
+
+            std::thread::spawn(move || {
+                if let Err(e) = handle_keypress(key_event, state, drawing_area) {
+                    eprintln!("Keypress handling error: {}", e);
+                }
+            });
+        }
+
+        glib::Propagation::Proceed
+    });
+    window.add_controller(key_controller);
+
     let state_clone = Arc::clone(&state);
     let url_entry_clone = url_entry.clone();
     let drawing_area_clone = drawing_area.clone();
@@ -140,6 +196,90 @@ fn handle_navigation(url: String, state: Arc<Mutex<BrowserState>>, drawing_area:
     match response {
         RendererMessage::FrameReady { width, height, pixels } => {
             println!("Received rendered frame: {}x{}", width, height);
+
+            let pixbuf = Pixbuf::from_bytes(
+                &glib::Bytes::from(&pixels),
+                gdk_pixbuf::Colorspace::Rgb,
+                true,
+                8,
+                width as i32,
+                height as i32,
+                (width * 4) as i32,
+            );
+
+            {
+                let mut state = state.lock().unwrap();
+                state.current_pixbuf = Some(pixbuf);
+            }
+
+            drawing_area.queue_draw();
+        }
+        RendererMessage::Error { message } => {
+            eprintln!("Renderer error: {}", message);
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_click(x: f32, y: f32, state: Arc<Mutex<BrowserState>>, drawing_area: DrawingArea) -> Result<()> {
+    println!("Handling click at ({}, {})", x, y);
+
+    ensure_renderer_running(&state)?;
+
+    let message = BrowserMessage::MouseClick { x, y };
+
+    send_to_renderer(&state, &message)?;
+
+    // Check if there's a response (renderer only sends response if state changed)
+    let response = read_from_renderer(&state)?;
+
+    match response {
+        RendererMessage::FrameReady { width, height, pixels } => {
+            println!("Received updated frame after click: {}x{}", width, height);
+
+            let pixbuf = Pixbuf::from_bytes(
+                &glib::Bytes::from(&pixels),
+                gdk_pixbuf::Colorspace::Rgb,
+                true,
+                8,
+                width as i32,
+                height as i32,
+                (width * 4) as i32,
+            );
+
+            {
+                let mut state = state.lock().unwrap();
+                state.current_pixbuf = Some(pixbuf);
+            }
+
+            drawing_area.queue_draw();
+        }
+        RendererMessage::Error { message } => {
+            eprintln!("Renderer error: {}", message);
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn handle_keypress(key: KeyEvent, state: Arc<Mutex<BrowserState>>, drawing_area: DrawingArea) -> Result<()> {
+    println!("Handling keypress: {:?}", key);
+
+    ensure_renderer_running(&state)?;
+
+    let message = BrowserMessage::KeyPress { key };
+
+    send_to_renderer(&state, &message)?;
+
+    // Check if there's a response (renderer only sends response if state changed)
+    let response = read_from_renderer(&state)?;
+
+    match response {
+        RendererMessage::FrameReady { width, height, pixels } => {
+            println!("Received updated frame after keypress: {}x{}", width, height);
 
             let pixbuf = Pixbuf::from_bytes(
                 &glib::Bytes::from(&pixels),
