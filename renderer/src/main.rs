@@ -1,0 +1,122 @@
+mod css_parser;
+mod dom;
+mod html_parser;
+mod layout;
+mod render;
+mod style;
+
+use anyhow::Result;
+use shared::{BrowserMessage, RendererMessage};
+use std::io::{self, BufRead, Write};
+
+fn main() -> Result<()> {
+    eprintln!("Renderer process started");
+
+    // Send ready message
+    send_message(&RendererMessage::Ready)?;
+
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    for line in stdin.lock().lines() {
+        let line = line?;
+
+        match serde_json::from_str::<BrowserMessage>(&line) {
+            Ok(BrowserMessage::RenderHtml {
+                url,
+                html,
+                width,
+                height,
+            }) => {
+                eprintln!("Rendering: {} ({}x{})", url, width, height);
+
+                match render_html(&html, width, height) {
+                    Ok(pixels) => {
+                        let message = RendererMessage::FrameReady {
+                            width,
+                            height,
+                            pixels,
+                        };
+                        send_message(&message)?;
+                    }
+                    Err(e) => {
+                        eprintln!("Render error: {}", e);
+                        let message = RendererMessage::Error {
+                            message: format!("{}", e),
+                        };
+                        send_message(&message)?;
+                    }
+                }
+            }
+            Ok(BrowserMessage::Shutdown) => {
+                eprintln!("Renderer shutting down");
+                break;
+            }
+            Err(e) => {
+                eprintln!("Failed to parse message: {}", e);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn render_html(html: &str, width: u32, height: u32) -> Result<Vec<u8>> {
+    // Parse HTML
+    eprintln!("Parsing HTML...");
+    let dom = html_parser::HtmlParser::parse(html.to_string());
+
+    // Extract and parse CSS
+    eprintln!("Parsing CSS...");
+    let css = extract_css(&dom);
+    let stylesheet = css_parser::CssParser::parse(css);
+
+    // Build style tree
+    eprintln!("Building style tree...");
+    let styled_root = style::style_tree(&dom, &stylesheet);
+
+    // Build layout tree
+    eprintln!("Computing layout...");
+    let mut viewport = layout::Dimensions::default();
+    viewport.content.width = width as f32;
+    viewport.content.height = height as f32;
+
+    let layout_root = layout::layout_tree(&styled_root, viewport);
+
+    // Render to canvas
+    eprintln!("Rendering to canvas...");
+    let canvas = render::render(&layout_root, width as usize, height as usize);
+
+    eprintln!("Render complete!");
+    Ok(canvas.pixels)
+}
+
+fn extract_css(node: &dom::Node) -> String {
+    let mut css = String::new();
+
+    // Look for <style> elements
+    if let dom::NodeType::Element(ref elem) = node.node_type {
+        if elem.tag_name == "style" {
+            for child in &node.children {
+                if let dom::NodeType::Text(ref text) = child.node_type {
+                    css.push_str(text);
+                    css.push('\n');
+                }
+            }
+        }
+    }
+
+    // Recursively extract from children
+    for child in &node.children {
+        css.push_str(&extract_css(child));
+    }
+
+    css
+}
+
+fn send_message(message: &RendererMessage) -> Result<()> {
+    let json = serde_json::to_string(message)?;
+    println!("{}", json);
+    io::stdout().flush()?;
+    Ok(())
+}
