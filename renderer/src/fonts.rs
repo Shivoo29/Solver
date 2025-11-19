@@ -29,7 +29,7 @@ impl FontCache {
 
         for path in &font_paths {
             if let Ok(data) = std::fs::read(path) {
-                if let Ok(font) = Font::from_bytes(data as &[u8], FontSettings::default()) {
+                if let Ok(font) = Font::from_bytes(&data as &[u8], FontSettings::default()) {
                     return Some(font);
                 }
             }

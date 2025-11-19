@@ -3,7 +3,7 @@ use image::{DynamicImage, GenericImageView, ImageFormat};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ImageData {
     pub width: u32,
     pub height: u32,

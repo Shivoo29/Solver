@@ -6,7 +6,7 @@ mod render;
 mod style;
 // mod js_engine;  // Disabled due to rquickjs build complexity
 mod images;
-// mod fonts;  // Disabled - using simple text rendering for now
+mod fonts;  // Enabled for proper text rendering
 
 use anyhow::Result;
 use shared::{BrowserMessage, RendererMessage};

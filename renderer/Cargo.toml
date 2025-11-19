@@ -17,8 +17,8 @@ anyhow.workspace = true
 image = "0.25"
 reqwest = { version = "0.12", features = ["blocking"] }
 
-# Font rendering - using simpler approach for now
-# fontdue = "0.9"
+# Font rendering
+fontdue = "0.9"
 
 # Better text handling
 unicode-segmentation = "1.11"

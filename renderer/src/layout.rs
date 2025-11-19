@@ -1,5 +1,6 @@
 use crate::css_parser::{Unit, Value};
 use crate::style::{DisplayType, StyledNode};
+use crate::images::ImageData;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Dimensions {
@@ -36,6 +37,7 @@ pub struct LayoutBox<'a> {
 pub enum BoxType<'a> {
     BlockNode(&'a StyledNode<'a>),
     InlineNode(&'a StyledNode<'a>),
+    ImageNode(&'a StyledNode<'a>, Option<ImageData>),
     AnonymousBlock,
 }
 
@@ -107,7 +109,7 @@ impl<'a> LayoutBox<'a> {
 
     fn get_inline_container(&mut self) -> &mut LayoutBox<'a> {
         match self.box_type {
-            BoxType::InlineNode(_) | BoxType::AnonymousBlock => self,
+            BoxType::InlineNode(_) | BoxType::AnonymousBlock | BoxType::ImageNode(_, _) => self,
             BoxType::BlockNode(_) => {
                 match self.children.last() {
                     Some(&LayoutBox {
@@ -125,6 +127,7 @@ impl<'a> LayoutBox<'a> {
         match self.box_type {
             BoxType::BlockNode(_) => self.layout_block(containing_block),
             BoxType::InlineNode(_) | BoxType::AnonymousBlock => self.layout_inline(containing_block),
+            BoxType::ImageNode(_, _) => self.layout_inline(containing_block), // Treat images as inline for now
         }
     }
 
@@ -277,7 +280,7 @@ impl<'a> LayoutBox<'a> {
 
     fn get_style_node(&self) -> &'a StyledNode<'a> {
         match self.box_type {
-            BoxType::BlockNode(node) | BoxType::InlineNode(node) => node,
+            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block has no style node"),
         }
     }
