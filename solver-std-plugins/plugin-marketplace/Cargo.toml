@@ -1,0 +1,25 @@
+[package]
+name = "solver-plugin-marketplace"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+solver-core = { path = "../../solver-core" }
+solver-plugins = { path = "../../solver-plugins" }
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+async-trait = "0.1"
+
+# Marketplace features
+parking_lot = "0.12"
+url = "2.5"
+
+[features]
+default = ["plugin-discovery", "plugin-installation", "security-sandbox"]
+plugin-discovery = []
+plugin-installation = []
+security-sandbox = []
+community-plugins = []

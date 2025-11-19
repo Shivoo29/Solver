@@ -1,0 +1,12 @@
+[package]
+name = "solver-javascript-plugin"
+version = "0.1.0"
+edition = "2021"
+authors = ["Solver Team"]
+
+[dependencies]
+solver-core = { path = "../../solver-core" }
+solver-plugins = { path = "../../solver-plugins" }
+anyhow = "1.0"
+async-trait = "0.1"
+rquickjs = { version = "0.6", features = ["array-buffer", "classes"] }

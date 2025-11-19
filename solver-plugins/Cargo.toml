@@ -1,0 +1,11 @@
+[package]
+name = "solver-plugins"
+version = "0.1.0"
+edition = "2021"
+authors = ["Solver Team"]
+
+[dependencies]
+solver-core = { path = "../solver-core" }
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+async-trait = "0.1"

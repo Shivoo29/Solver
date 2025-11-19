@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Solver Browser Test</title>
+    <style>
+        body {
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            font-size: 32px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .flex-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .flex-item {
+            background-color: #e0e0e0;
+            padding: 15px;
+            border-radius: 5px;
+            flex: 1;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to Solver Browser!</h1>
+        <p>This is a test of the full rendering engine architecture:</p>
+        <ul>
+            <li>HTML Parser ✅</li>
+            <li>CSS Parser ✅</li>
+            <li>Layout Engine (Flexbox, Grid) ✅</li>
+            <li>Rendering Pipeline ✅</li>
+        </ul>
+
+        <div class="flex-container">
+            <div class="flex-item">
+                <h3>Box 1</h3>
+                <p>Flexbox layout test</p>
+            </div>
+            <div class="flex-item">
+                <h3>Box 2</h3>
+                <p>Flexbox layout test</p>
+            </div>
+            <div class="flex-item">
+                <h3>Box 3</h3>
+                <p>Flexbox layout test</p>
+            </div>
+        </div>
+
+        <button class="button">Click Me!</button>
+    </div>
+</body>
+</html>

@@ -1,0 +1,25 @@
+[package]
+name = "solver-demo"
+version = "0.1.0"
+edition = "2021"
+authors = ["Solver Team"]
+
+[[bin]]
+name = "solver-demo"
+path = "src/main.rs"
+
+[dependencies]
+solver-core = { path = "../solver-core" }
+solver-plugins = { path = "../solver-plugins" }
+solver-rendering-plugin = { path = "../solver-std-plugins/rendering" }
+solver-javascript-plugin = { path = "../solver-std-plugins/javascript" }
+solver-networking-plugin = { path = "../solver-std-plugins/networking" }
+solver-ai-assistant = { path = "../solver-std-plugins/ai-assistant" }
+solver-privacy-sandbox = { path = "../solver-std-plugins/privacy-sandbox" }
+solver-performance = { path = "../solver-std-plugins/performance" }
+solver-pwa-platform = { path = "../solver-std-plugins/pwa-platform" }
+solver-plugin-marketplace = { path = "../solver-std-plugins/plugin-marketplace" }
+
+anyhow = "1.0"
+tokio = { version = "1.40", features = ["full"] }
+clap = { version = "4.5", features = ["derive"] }

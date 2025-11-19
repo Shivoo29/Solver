@@ -1,6 +1,24 @@
 [workspace]
 resolver = "2"
 members = [
+    # Core architecture
+    "solver-core",
+    "solver-plugins",
+
+    # Standard plugins
+    "solver-std-plugins/rendering",
+    "solver-std-plugins/javascript",
+    "solver-std-plugins/networking",
+    "solver-std-plugins/ai-assistant",
+    "solver-std-plugins/privacy-sandbox",
+    "solver-std-plugins/performance",
+    "solver-std-plugins/pwa-platform",
+    "solver-std-plugins/plugin-marketplace",
+
+    # Demo browser
+    "solver-demo",
+
+    # Legacy (will be refactored into plugins)
     "browser",
     "renderer",
     "shared",

@@ -1,0 +1,20 @@
+[package]
+name = "solver-rendering-plugin"
+version = "0.1.0"
+edition = "2021"
+authors = ["Solver Team"]
+
+[dependencies]
+solver-core = { path = "../../solver-core" }
+solver-plugins = { path = "../../solver-plugins" }
+anyhow = "1.0"
+async-trait = "0.1"
+
+# Re-use dependencies from existing renderer
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+image = "0.25"
+fontdue = "0.9"
+
+# Keep reference to existing renderer code for now
+# We'll refactor incrementally

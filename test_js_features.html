@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Features Test</title>
+    <style>
+        body {
+            font-size: 16px;
+            color: #333333;
+        }
+        h1 {
+            color: #0066cc;
+            font-size: 24px;
+        }
+        .test-section {
+            background-color: #f0f0f0;
+        }
+        #result {
+            color: green;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Solver Browser - JavaScript Features Test</h1>
+
+    <div class="test-section">
+        <p>Testing console.log</p>
+    </div>
+
+    <div id="result">Results will appear in console</div>
+
+    <script>
+        // Test 1: Console logging
+        console.log('=== JavaScript Features Test ===');
+        console.log('Test 1: Console.log works!');
+
+        // Test 2: Variables and expressions
+        var x = 10;
+        var y = 20;
+        var sum = x + y;
+        console.log('Test 2: 10 + 20 =', sum);
+
+        // Test 3: getElementById
+        console.log('Test 3: Testing getElementById...');
+        var element = document.getElementById('result');
+        console.log('Element found:', element);
+
+        // Test 4: querySelector
+        console.log('Test 4: Testing querySelector...');
+        var section = document.querySelector('.test-section');
+        console.log('Section found:', section);
+
+        // Test 5: localStorage
+        console.log('Test 5: Testing localStorage...');
+        localStorage.setItem('test-key', 'test-value');
+        var stored = localStorage.getItem('test-key');
+        console.log('Stored value:', stored);
+
+        // Test 6: setTimeout (stub)
+        console.log('Test 6: Testing setTimeout...');
+        setTimeout('console.log("Timeout callback")', 1000);
+
+        // Test 7: fetch (stub)
+        console.log('Test 7: Testing fetch...');
+        var response = fetch('https://api.example.com/data');
+        console.log('Fetch response:', response);
+
+        // Test 8: alert
+        console.log('Test 8: Testing alert...');
+        alert('This is an alert!');
+
+        console.log('=== All Tests Complete ===');
+    </script>
+</body>
+</html>

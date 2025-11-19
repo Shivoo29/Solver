@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas 2D Test</title>
+    <style>
+        body {
+            background-color: #282c34;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #canvas {
+            border: 2px solid #61dafb;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="myCanvas" width="800" height="600"></canvas>
+    <script>
+        var canvas = document.getElementById('myCanvas');
+        var ctx = canvas.getContext('2d');
+
+        // Draw rectangle
+        ctx.fillStyle = '#61dafb';
+        ctx.fillRect(50, 50, 200, 100);
+
+        // Draw circle
+        ctx.beginPath();
+        ctx.arc(400, 100, 50, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ff6b6b';
+        ctx.fill();
+
+        // Draw text
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '30px Arial';
+        ctx.fillText('Canvas 2D Works!', 250, 300);
+
+        // Draw line
+        ctx.beginPath();
+        ctx.moveTo(100, 400);
+        ctx.lineTo(700, 400);
+        ctx.strokeStyle = '#4ecdc4';
+        ctx.lineWidth = 5;
+        ctx.stroke();
+    </script>
+</body>
+</html>
