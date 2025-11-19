@@ -88,7 +88,7 @@ impl ImageCache {
 
         // Check if base64
         if header.contains("base64") {
-            let decoded = base64::decode(data)?;
+            let decoded = base64_decode::decode(data)?;
             let img = image::load_from_memory(&decoded)?;
             Ok(Self::image_to_data(img))
         } else {
@@ -110,14 +110,11 @@ impl ImageCache {
 }
 
 // Base64 decode helper
-mod base64 {
+mod base64_decode {
     use anyhow::Result;
+    use base64::{Engine as _, engine::general_purpose};
 
     pub fn decode(input: &str) -> Result<Vec<u8>> {
-        use std::io::Read;
-
-        // Simple base64 decoder - in production use the base64 crate
-        // For now, return error
-        anyhow::bail!("Base64 decoding not yet implemented. Use the base64 crate.")
+        Ok(general_purpose::STANDARD.decode(input)?)
     }
 }

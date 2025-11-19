@@ -88,7 +88,9 @@ fn render_html(html: &str, width: u32, height: u32) -> Result<Vec<u8>> {
     viewport.content.width = width as f32;
     viewport.content.height = height as f32;
 
-    let layout_root = layout::layout_tree(&styled_root, viewport);
+    // Create image cache for loading images
+    let image_cache = images::ImageCache::new();
+    let layout_root = layout::layout_tree(&styled_root, viewport, &image_cache);
 
     // Render to canvas
     eprintln!("Rendering to canvas...");

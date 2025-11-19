@@ -165,12 +165,15 @@ fn fetch_url(url: &str) -> Result<String> {
     <h1>Welcome to Solver Browser!</h1>
     <p>This is a minimal web browser built with Rust.</p>
     <div class="highlight">Security, Privacy, and Performance - Built Right.</div>
+    <p>Image Rendering Test:</p>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mP8z8BQz0AEYBxVSF+FABJADveWkH6oAAAAAElFTkSuQmCC" alt="Test"/>
     <p>Features:</p>
     <div>
         <p>Memory-safe Rust rendering engine</p>
         <p>Multi-process sandboxed architecture</p>
         <p>No telemetry or tracking</p>
         <p>JavaScript engine (QuickJS via rquickjs) - WORKING!</p>
+        <p>Image rendering - TESTING!</p>
     </div>
     <script>
         console.log('Second script tag also executing!');

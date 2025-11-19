@@ -2,6 +2,7 @@ use crate::css_parser::Color;
 use crate::dom::NodeType;
 use crate::layout::{BoxType, LayoutBox, Rect};
 use crate::fonts::FontCache;
+use crate::images::ImageData;
 
 pub struct Canvas {
     pub pixels: Vec<u8>,
@@ -24,7 +25,13 @@ impl Canvas {
     pub fn paint_item(&mut self, layout_box: &LayoutBox) {
         self.render_background(layout_box);
         self.render_borders(layout_box);
-        self.render_text(layout_box);
+
+        // Render image if this is an ImageNode
+        if let BoxType::ImageNode(_, Some(image_data)) = &layout_box.box_type {
+            self.render_image(layout_box, image_data);
+        } else {
+            self.render_text(layout_box);
+        }
 
         for child in &layout_box.children {
             self.paint_item(child);
@@ -90,6 +97,68 @@ impl Canvas {
             },
             color,
         );
+    }
+
+    fn render_image(&mut self, layout_box: &LayoutBox, image_data: &ImageData) {
+        let rect = layout_box.dimensions.content;
+        let dest_x = rect.x as usize;
+        let dest_y = rect.y as usize;
+        let dest_width = rect.width as usize;
+        let dest_height = rect.height as usize;
+
+        eprintln!("Rendering image at ({}, {}) size {}x{}", dest_x, dest_y, dest_width, dest_height);
+
+        // Simple nearest-neighbor scaling for now
+        for dy in 0..dest_height {
+            for dx in 0..dest_width {
+                let canvas_x = dest_x + dx;
+                let canvas_y = dest_y + dy;
+
+                if canvas_x >= self.width || canvas_y >= self.height {
+                    continue;
+                }
+
+                // Map destination pixel to source pixel
+                let src_x = ((dx as f32 / dest_width as f32) * image_data.width as f32) as usize;
+                let src_y = ((dy as f32 / dest_height as f32) * image_data.height as f32) as usize;
+
+                if src_x >= image_data.width as usize || src_y >= image_data.height as usize {
+                    continue;
+                }
+
+                // Get source pixel (RGBA format)
+                let src_offset = (src_y * image_data.width as usize + src_x) * 4;
+                let src_r = image_data.pixels[src_offset];
+                let src_g = image_data.pixels[src_offset + 1];
+                let src_b = image_data.pixels[src_offset + 2];
+                let src_a = image_data.pixels[src_offset + 3];
+
+                // Get destination pixel offset
+                let dest_offset = (canvas_y * self.width + canvas_x) * 4;
+
+                // Alpha blending
+                if src_a == 255 {
+                    // Fully opaque - just copy
+                    self.pixels[dest_offset] = src_r;
+                    self.pixels[dest_offset + 1] = src_g;
+                    self.pixels[dest_offset + 2] = src_b;
+                    self.pixels[dest_offset + 3] = 255;
+                } else if src_a > 0 {
+                    // Blend with background
+                    let alpha = src_a as f32 / 255.0;
+                    let inv_alpha = 1.0 - alpha;
+
+                    let bg_r = self.pixels[dest_offset] as f32;
+                    let bg_g = self.pixels[dest_offset + 1] as f32;
+                    let bg_b = self.pixels[dest_offset + 2] as f32;
+
+                    self.pixels[dest_offset] = ((src_r as f32 * alpha) + (bg_r * inv_alpha)) as u8;
+                    self.pixels[dest_offset + 1] = ((src_g as f32 * alpha) + (bg_g * inv_alpha)) as u8;
+                    self.pixels[dest_offset + 2] = ((src_b as f32 * alpha) + (bg_b * inv_alpha)) as u8;
+                    self.pixels[dest_offset + 3] = 255;
+                }
+            }
+        }
     }
 
     fn render_text(&mut self, layout_box: &LayoutBox) {

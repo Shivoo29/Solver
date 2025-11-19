@@ -1,6 +1,7 @@
 use crate::css_parser::{Unit, Value};
 use crate::style::{DisplayType, StyledNode};
-use crate::images::ImageData;
+use crate::images::{ImageData, ImageCache};
+use crate::dom::NodeType;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Dimensions {
@@ -69,28 +70,61 @@ impl Rect {
 pub fn layout_tree<'a>(
     node: &'a StyledNode<'a>,
     mut containing_block: Dimensions,
+    image_cache: &ImageCache,
 ) -> LayoutBox<'a> {
     containing_block.content.height = 0.0;
 
-    let mut root_box = build_layout_tree(node);
+    let mut root_box = build_layout_tree(node, image_cache);
     root_box.layout(containing_block);
     root_box
 }
 
-fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>) -> LayoutBox<'a> {
-    let mut root = LayoutBox::new(match style_node.display().display_type {
-        DisplayType::Block => BoxType::BlockNode(style_node),
-        DisplayType::Inline => BoxType::InlineNode(style_node),
-        DisplayType::None => panic!("Root node has display: none"),
-    });
+fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>, image_cache: &ImageCache) -> LayoutBox<'a> {
+    // Check if this is an <img> element
+    let box_type = if let NodeType::Element(elem) = &style_node.node.node_type {
+        if elem.tag_name == "img" {
+            // Try to load the image
+            eprintln!("Found <img> tag");
+            let image_data = elem.attributes.get("src")
+                .and_then(|src| {
+                    eprintln!("Loading image from: {}", src);
+                    match image_cache.load_image(src) {
+                        Ok(img) => {
+                            eprintln!("Image loaded successfully: {}x{}", img.width, img.height);
+                            Some(img)
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to load image: {}", e);
+                            None
+                        }
+                    }
+                });
+
+            BoxType::ImageNode(style_node, image_data)
+        } else {
+            match style_node.display().display_type {
+                DisplayType::Block => BoxType::BlockNode(style_node),
+                DisplayType::Inline => BoxType::InlineNode(style_node),
+                DisplayType::None => panic!("Root node has display: none"),
+            }
+        }
+    } else {
+        match style_node.display().display_type {
+            DisplayType::Block => BoxType::BlockNode(style_node),
+            DisplayType::Inline => BoxType::InlineNode(style_node),
+            DisplayType::None => panic!("Root node has display: none"),
+        }
+    };
+
+    let mut root = LayoutBox::new(box_type);
 
     for child in &style_node.children {
         match child.display().display_type {
-            DisplayType::Block => root.children.push(build_layout_tree(child)),
+            DisplayType::Block => root.children.push(build_layout_tree(child, image_cache)),
             DisplayType::Inline => root
                 .get_inline_container()
                 .children
-                .push(build_layout_tree(child)),
+                .push(build_layout_tree(child, image_cache)),
             DisplayType::None => {}
         }
     }
@@ -127,7 +161,7 @@ impl<'a> LayoutBox<'a> {
         match self.box_type {
             BoxType::BlockNode(_) => self.layout_block(containing_block),
             BoxType::InlineNode(_) | BoxType::AnonymousBlock => self.layout_inline(containing_block),
-            BoxType::ImageNode(_, _) => self.layout_inline(containing_block), // Treat images as inline for now
+            BoxType::ImageNode(_, _) => self.layout_image(containing_block),
         }
     }
 
@@ -152,6 +186,27 @@ impl<'a> LayoutBox<'a> {
             .iter()
             .map(|child| child.dimensions.margin_box().height)
             .sum();
+    }
+
+    fn layout_image(&mut self, containing_block: Dimensions) {
+        // Set position
+        self.dimensions.content.x = containing_block.content.x;
+        self.dimensions.content.y = containing_block.content.y + containing_block.content.height;
+
+        // Get image dimensions
+        if let BoxType::ImageNode(_, Some(image_data)) = &self.box_type {
+            // Use actual image dimensions, but cap at containing block width
+            self.dimensions.content.width = image_data.width.min(containing_block.content.width as u32) as f32;
+            self.dimensions.content.height = image_data.height as f32;
+
+            eprintln!("Image layout: {}x{} (original: {}x{})",
+                self.dimensions.content.width, self.dimensions.content.height,
+                image_data.width, image_data.height);
+        } else {
+            // No image data, use small default
+            self.dimensions.content.width = 10.0;
+            self.dimensions.content.height = 10.0;
+        }
     }
 
     fn calculate_block_width(&mut self, containing_block: Dimensions) {
