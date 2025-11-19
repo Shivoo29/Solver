@@ -1,6 +1,7 @@
 mod ai_demo;
 mod privacy_demo;
 mod performance_demo;
+mod full_demo;
 
 use anyhow::Result;
 use clap::Parser;
@@ -31,6 +32,10 @@ struct Args {
     /// Run performance & battery demo
     #[arg(long)]
     performance_demo: bool,
+
+    /// Run full system demo (all plugins)
+    #[arg(long)]
+    full_demo: bool,
 }
 
 #[tokio::main]
@@ -52,8 +57,13 @@ async fn main() -> Result<()> {
         return performance_demo::run_performance_demo().await;
     }
 
+    // Run full demo if requested
+    if args.full_demo {
+        return full_demo::run_full_demo().await;
+    }
+
     // Require URL if not running demo
-    let url = args.url.ok_or_else(|| anyhow::anyhow!("URL required (or use --ai-demo, --privacy-demo, or --performance-demo)"))?;
+    let url = args.url.ok_or_else(|| anyhow::anyhow!("URL required (or use --ai-demo, --privacy-demo, --performance-demo, or --full-demo)"))?;
 
     println!("Solver Browser - Plugin Architecture Demo");
     println!("=========================================\n");
