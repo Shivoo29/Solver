@@ -1,5 +1,5 @@
 use crate::css_parser::{Unit, Value};
-use crate::style::{DisplayType, StyledNode, FlexDirection, JustifyContent, AlignItems};
+use crate::style::{DisplayType, StyledNode, FlexDirection, JustifyContent, AlignItems, GridTrackSize};
 use crate::images::{ImageData, ImageCache};
 use crate::dom::NodeType;
 
@@ -66,6 +66,7 @@ pub enum BoxType<'a> {
     TableRowNode(&'a StyledNode<'a>),
     TableCellNode(&'a StyledNode<'a>),
     FlexNode(&'a StyledNode<'a>),
+    GridNode(&'a StyledNode<'a>),
     AnonymousBlock,
 }
 
@@ -149,6 +150,7 @@ fn build_layout_tree<'a>(
                 DisplayType::TableRow => BoxType::TableRowNode(style_node),
                 DisplayType::TableCell => BoxType::TableCellNode(style_node),
                 DisplayType::Flex => BoxType::FlexNode(style_node),
+                DisplayType::Grid => BoxType::GridNode(style_node),
                 DisplayType::None => panic!("Root node has display: none"),
             }
         }
@@ -173,7 +175,7 @@ fn build_layout_tree<'a>(
             DisplayType::Table | DisplayType::TableRow | DisplayType::TableCell => {
                 root.children.push(build_layout_tree(child, image_cache, form_values, input_counter))
             }
-            DisplayType::Flex => {
+            DisplayType::Flex | DisplayType::Grid => {
                 root.children.push(build_layout_tree(child, image_cache, form_values, input_counter))
             }
             DisplayType::None => {}
@@ -256,7 +258,7 @@ impl<'a> LayoutBox<'a> {
     fn get_inline_container(&mut self) -> &mut LayoutBox<'a> {
         match self.box_type {
             BoxType::InlineNode(_) | BoxType::AnonymousBlock | BoxType::ImageNode(_, _) | BoxType::FormElement(_, _) => self,
-            BoxType::BlockNode(_) | BoxType::TableNode(_) | BoxType::TableRowNode(_) | BoxType::TableCellNode(_) | BoxType::FlexNode(_) => {
+            BoxType::BlockNode(_) | BoxType::TableNode(_) | BoxType::TableRowNode(_) | BoxType::TableCellNode(_) | BoxType::FlexNode(_) | BoxType::GridNode(_) => {
                 match self.children.last() {
                     Some(&LayoutBox {
                         box_type: BoxType::AnonymousBlock,
@@ -279,6 +281,7 @@ impl<'a> LayoutBox<'a> {
             BoxType::TableRowNode(_) => self.layout_table_row(containing_block),
             BoxType::TableCellNode(_) => self.layout_table_cell(containing_block),
             BoxType::FlexNode(_) => self.layout_flex(containing_block),
+            BoxType::GridNode(_) => self.layout_grid(containing_block),
         }
     }
 
@@ -646,6 +649,134 @@ impl<'a> LayoutBox<'a> {
         }
     }
 
+    fn layout_grid(&mut self, containing_block: Dimensions) {
+        let style = self.get_style_node();
+
+        // Get grid properties
+        let column_tracks = style.grid_template_columns();
+        let row_tracks = style.grid_template_rows();
+        let gap = style.grid_gap();
+
+        // Set position and width like a block element
+        self.calculate_block_width(containing_block);
+        self.calculate_block_position(containing_block);
+
+        // If no grid template is defined, fall back to auto-flow
+        if column_tracks.is_empty() && row_tracks.is_empty() {
+            // Auto-flow: arrange children in a simple grid
+            let num_children = self.children.len();
+            if num_children == 0 {
+                return;
+            }
+
+            // Default to 2 columns for auto-flow
+            let num_cols = 2;
+            let num_rows = (num_children + num_cols - 1) / num_cols;
+
+            let col_width = (self.dimensions.content.width - gap * (num_cols as f32 - 1.0)) / num_cols as f32;
+
+            let mut row = 0;
+            let mut col = 0;
+            let mut max_row_height = 0.0_f32;
+            let mut y_offset = self.dimensions.content.y;
+
+            for child in &mut self.children {
+                // Calculate position
+                let x = self.dimensions.content.x + (col as f32 * (col_width + gap));
+                let y = y_offset;
+
+                // Layout child
+                let mut child_container = self.dimensions;
+                child_container.content.x = x;
+                child_container.content.y = y;
+                child_container.content.width = col_width;
+                child_container.content.height = 0.0;
+
+                child.layout(child_container);
+
+                max_row_height = max_row_height.max(child.dimensions.margin_box().height);
+
+                col += 1;
+                if col >= num_cols {
+                    col = 0;
+                    row += 1;
+                    y_offset += max_row_height + gap;
+                    max_row_height = 0.0;
+                }
+            }
+
+            self.dimensions.content.height = y_offset - self.dimensions.content.y;
+            return;
+        }
+
+        // Calculate column sizes
+        let num_cols = if !column_tracks.is_empty() {
+            column_tracks.len()
+        } else {
+            1
+        };
+
+        let num_rows = if !row_tracks.is_empty() {
+            row_tracks.len()
+        } else {
+            (self.children.len() + num_cols - 1) / num_cols
+        };
+
+        // Calculate available space
+        let available_width = self.dimensions.content.width - gap * ((num_cols - 1) as f32);
+        let available_height = containing_block.content.height;
+
+        // Resolve column track sizes
+        let col_sizes = resolve_track_sizes(&column_tracks, available_width);
+        let row_sizes = if !row_tracks.is_empty() {
+            resolve_track_sizes(&row_tracks, available_height)
+        } else {
+            vec![100.0; num_rows] // Default row height
+        };
+
+        // Position children in grid
+        let mut child_idx = 0;
+        for row_idx in 0..num_rows {
+            for col_idx in 0..num_cols {
+                if child_idx >= self.children.len() {
+                    break;
+                }
+
+                let child = &mut self.children[child_idx];
+
+                // Calculate position
+                let x = self.dimensions.content.x +
+                    col_sizes[0..col_idx].iter().sum::<f32>() +
+                    (col_idx as f32 * gap);
+
+                let y = self.dimensions.content.y +
+                    row_sizes[0..row_idx].iter().sum::<f32>() +
+                    (row_idx as f32 * gap);
+
+                // Set child dimensions
+                child.dimensions.content.x = x;
+                child.dimensions.content.y = y;
+                child.dimensions.content.width = col_sizes[col_idx];
+                child.dimensions.content.height = row_sizes[row_idx];
+
+                // Layout child with these constraints
+                let mut child_container = self.dimensions;
+                child_container.content.x = x;
+                child_container.content.y = y;
+                child_container.content.width = col_sizes[col_idx];
+                child_container.content.height = row_sizes[row_idx];
+
+                child.layout(child_container);
+
+                child_idx += 1;
+            }
+        }
+
+        // Calculate total grid height
+        let total_height = row_sizes.iter().sum::<f32>() + (gap * (num_rows - 1) as f32);
+        self.dimensions.content.height = total_height;
+    }
+
     fn calculate_block_width(&mut self, containing_block: Dimensions) {
         let style = self.get_style_node();
 
@@ -774,7 +905,7 @@ impl<'a> LayoutBox<'a> {
         match self.box_type {
             BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) |
             BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
-            BoxType::TableCellNode(node) | BoxType::FlexNode(node) => node,
+            BoxType::TableCellNode(node) | BoxType::FlexNode(node) | BoxType::GridNode(node) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block has no style node"),
         }
     }
@@ -787,4 +918,47 @@ impl Value {
             _ => 0.0,
         }
     }
+}
+
+// Helper function to resolve grid track sizes
+fn resolve_track_sizes(tracks: &[GridTrackSize], available_space: f32) -> Vec<f32> {
+    if tracks.is_empty() {
+        return vec![];
+    }
+
+    let mut sizes = vec![0.0; tracks.len()];
+    let mut total_fr = 0.0;
+    let mut used_space = 0.0;
+
+    // First pass: resolve fixed (px) and auto sizes
+    for (i, track) in tracks.iter().enumerate() {
+        match track {
+            GridTrackSize::Px(px) => {
+                sizes[i] = *px;
+                used_space += px;
+            }
+            GridTrackSize::Fr(fr) => {
+                total_fr += fr;
+            }
+            GridTrackSize::Auto => {
+                // For auto, use a default size for now
+                sizes[i] = 100.0;
+                used_space += 100.0;
+            }
+        }
+    }
+
+    // Second pass: distribute remaining space to fr units
+    if total_fr > 0.0 {
+        let remaining_space = (available_space - used_space).max(0.0);
+        let fr_size = remaining_space / total_fr;
+
+        for (i, track) in tracks.iter().enumerate() {
+            if let GridTrackSize::Fr(fr) = track {
+                sizes[i] = fr * fr_size;
+            }
+        }
+    }
+
+    sizes
 }

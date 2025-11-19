@@ -25,6 +25,7 @@ pub enum DisplayType {
     TableRow,
     TableCell,
     Flex,
+    Grid,
 }
 
 impl Default for DisplayType {
@@ -137,6 +138,7 @@ impl<'a> StyledNode<'a> {
                     "table-row" => DisplayType::TableRow,
                     "table-cell" => DisplayType::TableCell,
                     "flex" => DisplayType::Flex,
+                    "grid" => DisplayType::Grid,
                     _ => return Display { display_type: self.default_display_from_tag() },
                 };
                 Display { display_type }
@@ -248,6 +250,79 @@ impl<'a> StyledNode<'a> {
             _ => None,
         }
     }
+
+    // Grid properties
+    pub fn grid_template_columns(&self) -> Vec<GridTrackSize> {
+        match self.value("grid-template-columns") {
+            Some(Value::Keyword(s)) => parse_grid_tracks(&s),
+            _ => vec![],
+        }
+    }
+
+    pub fn grid_template_rows(&self) -> Vec<GridTrackSize> {
+        match self.value("grid-template-rows") {
+            Some(Value::Keyword(s)) => parse_grid_tracks(&s),
+            _ => vec![],
+        }
+    }
+
+    pub fn grid_column_start(&self) -> usize {
+        match self.value("grid-column-start") {
+            Some(Value::Length(n, _)) => n as usize,
+            _ => 0,
+        }
+    }
+
+    pub fn grid_column_end(&self) -> Option<usize> {
+        match self.value("grid-column-end") {
+            Some(Value::Length(n, _)) => Some(n as usize),
+            _ => None,
+        }
+    }
+
+    pub fn grid_row_start(&self) -> usize {
+        match self.value("grid-row-start") {
+            Some(Value::Length(n, _)) => n as usize,
+            _ => 0,
+        }
+    }
+
+    pub fn grid_row_end(&self) -> Option<usize> {
+        match self.value("grid-row-end") {
+            Some(Value::Length(n, _)) => Some(n as usize),
+            _ => None,
+        }
+    }
+
+    pub fn grid_gap(&self) -> f32 {
+        match self.value("grid-gap").or_else(|| self.value("gap")) {
+            Some(Value::Length(n, Unit::Px)) => n,
+            _ => 0.0,
+        }
+    }
+}
+
+fn parse_grid_tracks(s: &str) -> Vec<GridTrackSize> {
+    // Simple parsing: split by whitespace and parse each track
+    s.split_whitespace()
+        .filter_map(|track| {
+            if track.ends_with("px") {
+                track.trim_end_matches("px")
+                    .parse::<f32>()
+                    .ok()
+                    .map(GridTrackSize::Px)
+            } else if track.ends_with("fr") {
+                track.trim_end_matches("fr")
+                    .parse::<f32>()
+                    .ok()
+                    .map(GridTrackSize::Fr)
+            } else if track == "auto" {
+                Some(GridTrackSize::Auto)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 // Flexbox enums
@@ -274,4 +349,12 @@ pub enum AlignItems {
     FlexEnd,
     Center,
     Stretch,
+}
+
+// Grid enums
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GridTrackSize {
+    Px(f32),      // Fixed size in pixels
+    Fr(f32),      // Fractional unit (share of remaining space)
+    Auto,         // Auto-sized based on content
 }
