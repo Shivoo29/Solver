@@ -8,11 +8,14 @@ pub struct HtmlParser {
 
 impl HtmlParser {
     pub fn parse(source: String) -> Node {
+        eprintln!("[HTML Parser] Starting parse of {} bytes", source.len());
         let mut parser = HtmlParser {
             pos: 0,
             input: source,
         };
+        eprintln!("[HTML Parser] Parsing nodes...");
         let nodes = parser.parse_nodes();
+        eprintln!("[HTML Parser] Parsed {} top-level nodes", nodes.len());
 
         // If there's only one root node, return it; otherwise wrap in a div
         if nodes.len() == 1 {

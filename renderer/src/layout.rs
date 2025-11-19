@@ -1,5 +1,5 @@
 use crate::css_parser::{Unit, Value};
-use crate::style::{DisplayType, StyledNode};
+use crate::style::{DisplayType, StyledNode, FlexDirection, JustifyContent, AlignItems};
 use crate::images::{ImageData, ImageCache};
 use crate::dom::NodeType;
 
@@ -65,6 +65,7 @@ pub enum BoxType<'a> {
     TableNode(&'a StyledNode<'a>),
     TableRowNode(&'a StyledNode<'a>),
     TableCellNode(&'a StyledNode<'a>),
+    FlexNode(&'a StyledNode<'a>),
     AnonymousBlock,
 }
 
@@ -147,6 +148,7 @@ fn build_layout_tree<'a>(
                 DisplayType::Table => BoxType::TableNode(style_node),
                 DisplayType::TableRow => BoxType::TableRowNode(style_node),
                 DisplayType::TableCell => BoxType::TableCellNode(style_node),
+                DisplayType::Flex => BoxType::FlexNode(style_node),
                 DisplayType::None => panic!("Root node has display: none"),
             }
         }
@@ -169,6 +171,9 @@ fn build_layout_tree<'a>(
                 .children
                 .push(build_layout_tree(child, image_cache, form_values, input_counter)),
             DisplayType::Table | DisplayType::TableRow | DisplayType::TableCell => {
+                root.children.push(build_layout_tree(child, image_cache, form_values, input_counter))
+            }
+            DisplayType::Flex => {
                 root.children.push(build_layout_tree(child, image_cache, form_values, input_counter))
             }
             DisplayType::None => {}
@@ -251,7 +256,7 @@ impl<'a> LayoutBox<'a> {
     fn get_inline_container(&mut self) -> &mut LayoutBox<'a> {
         match self.box_type {
             BoxType::InlineNode(_) | BoxType::AnonymousBlock | BoxType::ImageNode(_, _) | BoxType::FormElement(_, _) => self,
-            BoxType::BlockNode(_) | BoxType::TableNode(_) | BoxType::TableRowNode(_) | BoxType::TableCellNode(_) => {
+            BoxType::BlockNode(_) | BoxType::TableNode(_) | BoxType::TableRowNode(_) | BoxType::TableCellNode(_) | BoxType::FlexNode(_) => {
                 match self.children.last() {
                     Some(&LayoutBox {
                         box_type: BoxType::AnonymousBlock,
@@ -273,6 +278,7 @@ impl<'a> LayoutBox<'a> {
             BoxType::TableNode(_) => self.layout_table(containing_block),
             BoxType::TableRowNode(_) => self.layout_table_row(containing_block),
             BoxType::TableCellNode(_) => self.layout_table_cell(containing_block),
+            BoxType::FlexNode(_) => self.layout_flex(containing_block),
         }
     }
 
@@ -435,6 +441,211 @@ impl<'a> LayoutBox<'a> {
         }
     }
 
+    fn layout_flex(&mut self, containing_block: Dimensions) {
+        let style = self.get_style_node();
+
+        // Get flex properties
+        let flex_direction = style.flex_direction();
+        let justify_content = style.justify_content();
+        let align_items = style.align_items();
+
+        // Set position and width like a block element
+        self.calculate_block_width(containing_block);
+        self.calculate_block_position(containing_block);
+
+        let is_row = matches!(flex_direction, FlexDirection::Row | FlexDirection::RowReverse);
+
+        // Get available space in main axis
+        let available_main = if is_row {
+            self.dimensions.content.width
+        } else {
+            // For column, use containing block height or make it flexible
+            containing_block.content.height
+        };
+
+        // First pass: layout children to get their natural sizes
+        let mut total_flex_grow = 0.0_f32;
+        let mut total_base_size = 0.0_f32;
+
+        for child in &mut self.children {
+            let child_style = child.get_style_node();
+            total_flex_grow += child_style.flex_grow();
+
+            // Do initial layout to get base size
+            let mut child_container = self.dimensions;
+            child_container.content.height = 0.0;
+            child.layout(child_container);
+
+            let base_size = if is_row {
+                child.dimensions.margin_box().width
+            } else {
+                child.dimensions.margin_box().height
+            };
+            total_base_size += base_size;
+        }
+
+        // Calculate remaining space for flex-grow
+        let remaining_space = available_main - total_base_size;
+
+        // Second pass: position children with flexbox rules
+        let mut main_offset = 0.0_f32;
+        let mut max_cross = 0.0_f32;
+
+        // Calculate initial offset for justify-content
+        if !is_row || remaining_space <= 0.0 || total_flex_grow > 0.0 {
+            // For column or when there's no extra space, start at 0
+            main_offset = 0.0;
+        } else {
+            main_offset = match justify_content {
+                JustifyContent::FlexStart => 0.0,
+                JustifyContent::FlexEnd => remaining_space,
+                JustifyContent::Center => remaining_space / 2.0,
+                JustifyContent::SpaceBetween => 0.0,
+                JustifyContent::SpaceAround => {
+                    if self.children.len() > 0 {
+                        remaining_space / (self.children.len() as f32 * 2.0)
+                    } else {
+                        0.0
+                    }
+                }
+            };
+        }
+
+        // Calculate spacing for space-between/space-around
+        let spacing = if remaining_space > 0.0 && total_flex_grow == 0.0 {
+            match justify_content {
+                JustifyContent::SpaceBetween => {
+                    if self.children.len() > 1 {
+                        remaining_space / (self.children.len() as f32 - 1.0)
+                    } else {
+                        0.0
+                    }
+                }
+                JustifyContent::SpaceAround => {
+                    if self.children.len() > 0 {
+                        remaining_space / (self.children.len() as f32)
+                    } else {
+                        0.0
+                    }
+                }
+                _ => 0.0,
+            }
+        } else {
+            0.0
+        };
+
+        for child in &mut self.children {
+            let child_style = child.get_style_node();
+            let flex_grow = child_style.flex_grow();
+
+            // Calculate extra size from flex-grow
+            let extra_size = if total_flex_grow > 0.0 && remaining_space > 0.0 {
+                (flex_grow / total_flex_grow) * remaining_space
+            } else {
+                0.0
+            };
+
+            if is_row {
+                // Row direction: main axis is horizontal
+                child.dimensions.content.x = self.dimensions.content.x + main_offset;
+                child.dimensions.content.y = self.dimensions.content.y;
+
+                // Apply flex-grow to width
+                if extra_size > 0.0 {
+                    child.dimensions.content.width += extra_size;
+                }
+
+                // Handle align-items (cross axis)
+                let child_height = child.dimensions.margin_box().height;
+                match align_items {
+                    AlignItems::FlexStart => {
+                        child.dimensions.content.y = self.dimensions.content.y;
+                    }
+                    AlignItems::FlexEnd => {
+                        child.dimensions.content.y = self.dimensions.content.y +
+                            (self.dimensions.content.height - child_height);
+                    }
+                    AlignItems::Center => {
+                        child.dimensions.content.y = self.dimensions.content.y +
+                            (self.dimensions.content.height - child_height) / 2.0;
+                    }
+                    AlignItems::Stretch => {
+                        // Could stretch height here
+                    }
+                }
+
+                main_offset += child.dimensions.margin_box().width;
+                max_cross = max_cross.max(child_height);
+
+                // Add spacing
+                if matches!(justify_content, JustifyContent::SpaceBetween | JustifyContent::SpaceAround) {
+                    main_offset += spacing;
+                }
+            } else {
+                // Column direction: main axis is vertical
+                child.dimensions.content.x = self.dimensions.content.x;
+                child.dimensions.content.y = self.dimensions.content.y + main_offset;
+
+                // Apply flex-grow to height
+                if extra_size > 0.0 {
+                    child.dimensions.content.height += extra_size;
+                }
+
+                // Handle align-items (cross axis)
+                let child_width = child.dimensions.margin_box().width;
+                match align_items {
+                    AlignItems::FlexStart => {
+                        child.dimensions.content.x = self.dimensions.content.x;
+                    }
+                    AlignItems::FlexEnd => {
+                        child.dimensions.content.x = self.dimensions.content.x +
+                            (self.dimensions.content.width - child_width);
+                    }
+                    AlignItems::Center => {
+                        child.dimensions.content.x = self.dimensions.content.x +
+                            (self.dimensions.content.width - child_width) / 2.0;
+                    }
+                    AlignItems::Stretch => {
+                        // Could stretch width here
+                    }
+                }
+
+                main_offset += child.dimensions.margin_box().height;
+                max_cross = max_cross.max(child_width);
+
+                // Add spacing
+                if matches!(justify_content, JustifyContent::SpaceBetween | JustifyContent::SpaceAround) {
+                    main_offset += spacing;
+                }
+            }
+        }
+
+        // Handle reverse directions
+        if matches!(flex_direction, FlexDirection::RowReverse | FlexDirection::ColumnReverse) {
+            // Reverse the positions of children
+            if is_row {
+                for child in &mut self.children {
+                    let distance_from_start = child.dimensions.content.x - self.dimensions.content.x;
+                    child.dimensions.content.x = self.dimensions.content.x +
+                        (self.dimensions.content.width - distance_from_start - child.dimensions.content.width);
+                }
+            } else {
+                for child in &mut self.children {
+                    let distance_from_start = child.dimensions.content.y - self.dimensions.content.y;
+                    child.dimensions.content.y = self.dimensions.content.y +
+                        (self.dimensions.content.height - distance_from_start - child.dimensions.content.height);
+                }
+            }
+        }
+
+        // Set container's content height
+        if is_row {
+            self.dimensions.content.height = max_cross;
+        } else {
+            self.dimensions.content.height = main_offset;
+        }
+    }
+
     fn calculate_block_width(&mut self, containing_block: Dimensions) {
         let style = self.get_style_node();
 
@@ -563,7 +774,7 @@ impl<'a> LayoutBox<'a> {
         match self.box_type {
             BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) |
             BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
-            BoxType::TableCellNode(node) => node,
+            BoxType::TableCellNode(node) | BoxType::FlexNode(node) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block has no style node"),
         }
     }

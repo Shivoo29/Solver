@@ -388,7 +388,7 @@ impl Canvas {
         let style_node = match layout_box.box_type {
             BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) |
             BoxType::FormElement(node, _) | BoxType::TableNode(node) | BoxType::TableRowNode(node) |
-            BoxType::TableCellNode(node) => node,
+            BoxType::TableCellNode(node) | BoxType::FlexNode(node) => node,
             BoxType::AnonymousBlock => return,
         };
 
@@ -521,7 +521,7 @@ fn get_background_color(layout_box: &LayoutBox) -> Option<Color> {
     match layout_box.box_type {
         BoxType::BlockNode(style_node) | BoxType::InlineNode(style_node) | BoxType::ImageNode(style_node, _) |
         BoxType::FormElement(style_node, _) | BoxType::TableNode(style_node) | BoxType::TableRowNode(style_node) |
-        BoxType::TableCellNode(style_node) => {
+        BoxType::TableCellNode(style_node) | BoxType::FlexNode(style_node) => {
             style_node.background_color()
         }
         BoxType::AnonymousBlock => None,
@@ -532,7 +532,7 @@ fn get_border_color(layout_box: &LayoutBox) -> Option<Color> {
     match layout_box.box_type {
         BoxType::BlockNode(style_node) | BoxType::InlineNode(style_node) | BoxType::ImageNode(style_node, _) |
         BoxType::FormElement(style_node, _) | BoxType::TableNode(style_node) | BoxType::TableRowNode(style_node) |
-        BoxType::TableCellNode(style_node) => {
+        BoxType::TableCellNode(style_node) | BoxType::FlexNode(style_node) => {
             style_node.value("border-color").and_then(|v| match v {
                 crate::css_parser::Value::Color(c) => Some(c),
                 crate::css_parser::Value::Keyword(ref k) => {

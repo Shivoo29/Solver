@@ -24,6 +24,7 @@ pub enum DisplayType {
     Table,
     TableRow,
     TableCell,
+    Flex,
 }
 
 impl Default for DisplayType {
@@ -135,6 +136,7 @@ impl<'a> StyledNode<'a> {
                     "table" => DisplayType::Table,
                     "table-row" => DisplayType::TableRow,
                     "table-cell" => DisplayType::TableCell,
+                    "flex" => DisplayType::Flex,
                     _ => return Display { display_type: self.default_display_from_tag() },
                 };
                 Display { display_type }
@@ -183,4 +185,93 @@ impl<'a> StyledNode<'a> {
             _ => 16.0,
         }
     }
+
+    // Flexbox properties
+    pub fn flex_direction(&self) -> FlexDirection {
+        match self.value("flex-direction") {
+            Some(Value::Keyword(s)) => match s.as_str() {
+                "row" => FlexDirection::Row,
+                "row-reverse" => FlexDirection::RowReverse,
+                "column" => FlexDirection::Column,
+                "column-reverse" => FlexDirection::ColumnReverse,
+                _ => FlexDirection::Row,
+            },
+            _ => FlexDirection::Row,
+        }
+    }
+
+    pub fn justify_content(&self) -> JustifyContent {
+        match self.value("justify-content") {
+            Some(Value::Keyword(s)) => match s.as_str() {
+                "flex-start" => JustifyContent::FlexStart,
+                "flex-end" => JustifyContent::FlexEnd,
+                "center" => JustifyContent::Center,
+                "space-between" => JustifyContent::SpaceBetween,
+                "space-around" => JustifyContent::SpaceAround,
+                _ => JustifyContent::FlexStart,
+            },
+            _ => JustifyContent::FlexStart,
+        }
+    }
+
+    pub fn align_items(&self) -> AlignItems {
+        match self.value("align-items") {
+            Some(Value::Keyword(s)) => match s.as_str() {
+                "flex-start" => AlignItems::FlexStart,
+                "flex-end" => AlignItems::FlexEnd,
+                "center" => AlignItems::Center,
+                "stretch" => AlignItems::Stretch,
+                _ => AlignItems::Stretch,
+            },
+            _ => AlignItems::Stretch,
+        }
+    }
+
+    pub fn flex_grow(&self) -> f32 {
+        match self.value("flex-grow") {
+            Some(Value::Length(n, _)) => n,
+            _ => 0.0,
+        }
+    }
+
+    pub fn flex_shrink(&self) -> f32 {
+        match self.value("flex-shrink") {
+            Some(Value::Length(n, _)) => n,
+            _ => 1.0,
+        }
+    }
+
+    pub fn flex_basis(&self) -> Option<f32> {
+        match self.value("flex-basis") {
+            Some(Value::Length(n, Unit::Px)) => Some(n),
+            Some(Value::Keyword(s)) if s == "auto" => None,
+            _ => None,
+        }
+    }
+}
+
+// Flexbox enums
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FlexDirection {
+    Row,
+    RowReverse,
+    Column,
+    ColumnReverse,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum JustifyContent {
+    FlexStart,
+    FlexEnd,
+    Center,
+    SpaceBetween,
+    SpaceAround,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AlignItems {
+    FlexStart,
+    FlexEnd,
+    Center,
+    Stretch,
 }
