@@ -1,6 +1,6 @@
 use crate::css_parser::Color;
 use crate::dom::NodeType;
-use crate::layout::{BoxType, LayoutBox, Rect};
+use crate::layout::{BoxType, FormElementData, FormElementType, LayoutBox, Rect};
 use crate::fonts::FontCache;
 use crate::images::ImageData;
 
@@ -26,11 +26,17 @@ impl Canvas {
         self.render_background(layout_box);
         self.render_borders(layout_box);
 
-        // Render image if this is an ImageNode
-        if let BoxType::ImageNode(_, Some(image_data)) = &layout_box.box_type {
-            self.render_image(layout_box, image_data);
-        } else {
-            self.render_text(layout_box);
+        // Render based on box type
+        match &layout_box.box_type {
+            BoxType::ImageNode(_, Some(image_data)) => {
+                self.render_image(layout_box, image_data);
+            }
+            BoxType::FormElement(_, form_data) => {
+                self.render_form_element(layout_box, form_data);
+            }
+            _ => {
+                self.render_text(layout_box);
+            }
         }
 
         for child in &layout_box.children {
@@ -161,9 +167,172 @@ impl Canvas {
         }
     }
 
+    fn render_form_element(&mut self, layout_box: &LayoutBox, form_data: &FormElementData) {
+        let rect = layout_box.dimensions.content;
+
+        // Draw form element border
+        let border_color = Color { r: 128, g: 128, b: 128, a: 255 };
+        self.draw_rect_outline(rect, border_color, 1.0);
+
+        // Draw form element background (white for inputs, light gray for buttons)
+        let bg_color = match form_data.element_type {
+            FormElementType::Button | FormElementType::Submit => Color { r: 240, g: 240, b: 240, a: 255 },
+            FormElementType::Checkbox | FormElementType::Radio => Color { r: 255, g: 255, b: 255, a: 255 },
+            _ => Color { r: 255, g: 255, b: 255, a: 255 },
+        };
+
+        // Fill background (slightly inset from border)
+        let fill_rect = Rect {
+            x: rect.x + 1.0,
+            y: rect.y + 1.0,
+            width: rect.width - 2.0,
+            height: rect.height - 2.0,
+        };
+        self.paint_rect(fill_rect, bg_color);
+
+        // Render form element content
+        match form_data.element_type {
+            FormElementType::TextInput | FormElementType::Password |
+            FormElementType::Email | FormElementType::Number => {
+                self.render_input_field(rect, form_data);
+            }
+            FormElementType::Button | FormElementType::Submit => {
+                self.render_button(rect, form_data);
+            }
+            FormElementType::Textarea => {
+                self.render_textarea(rect, form_data);
+            }
+            FormElementType::Checkbox => {
+                self.render_checkbox(rect, form_data);
+            }
+            FormElementType::Radio => {
+                self.render_radio(rect, form_data);
+            }
+        }
+    }
+
+    fn render_input_field(&mut self, rect: Rect, form_data: &FormElementData) {
+        let text_color = Color { r: 0, g: 0, b: 0, a: 255 };
+        let placeholder_color = Color { r: 150, g: 150, b: 150, a: 255 };
+
+        let display_text = if !form_data.value.is_empty() {
+            if matches!(form_data.element_type, FormElementType::Password) {
+                "*".repeat(form_data.value.len())
+            } else {
+                form_data.value.clone()
+            }
+        } else if !form_data.placeholder.is_empty() {
+            form_data.placeholder.clone()
+        } else {
+            String::new()
+        };
+
+        if !display_text.is_empty() {
+            let color = if form_data.value.is_empty() { placeholder_color } else { text_color };
+            let text_rect = Rect {
+                x: rect.x + 8.0,
+                y: rect.y + 6.0,
+                width: rect.width - 16.0,
+                height: rect.height - 12.0,
+            };
+            self.render_with_fonts(&display_text, text_rect, color, 14.0);
+        }
+    }
+
+    fn render_button(&mut self, rect: Rect, form_data: &FormElementData) {
+        let text = if !form_data.value.is_empty() {
+            form_data.value.clone()
+        } else {
+            match form_data.element_type {
+                FormElementType::Submit => "Submit".to_string(),
+                _ => "Button".to_string(),
+            }
+        };
+
+        let text_color = Color { r: 0, g: 0, b: 0, a: 255 };
+        let text_rect = Rect {
+            x: rect.x + 10.0,
+            y: rect.y + 8.0,
+            width: rect.width - 20.0,
+            height: rect.height - 16.0,
+        };
+        self.render_with_fonts(&text, text_rect, text_color, 14.0);
+    }
+
+    fn render_textarea(&mut self, rect: Rect, form_data: &FormElementData) {
+        let text_color = Color { r: 0, g: 0, b: 0, a: 255 };
+        let placeholder_color = Color { r: 150, g: 150, b: 150, a: 255 };
+
+        let display_text = if !form_data.value.is_empty() {
+            &form_data.value
+        } else if !form_data.placeholder.is_empty() {
+            &form_data.placeholder
+        } else {
+            ""
+        };
+
+        if !display_text.is_empty() {
+            let color = if form_data.value.is_empty() { placeholder_color } else { text_color };
+            let text_rect = Rect {
+                x: rect.x + 8.0,
+                y: rect.y + 6.0,
+                width: rect.width - 16.0,
+                height: rect.height - 12.0,
+            };
+            self.render_with_fonts(display_text, text_rect, color, 14.0);
+        }
+    }
+
+    fn render_checkbox(&mut self, rect: Rect, _form_data: &FormElementData) {
+        // Draw checkbox square (already has border and background from render_form_element)
+        // Could add checkmark if checked, but for now just show the box
+    }
+
+    fn render_radio(&mut self, rect: Rect, _form_data: &FormElementData) {
+        // Draw radio button circle
+        let center_x = rect.x + rect.width / 2.0;
+        let center_y = rect.y + rect.height / 2.0;
+        let radius = (rect.width.min(rect.height) / 2.0) - 2.0;
+
+        // Draw circle border
+        let border_color = Color { r: 128, g: 128, b: 128, a: 255 };
+        self.draw_circle(center_x, center_y, radius, border_color);
+    }
+
+    fn draw_rect_outline(&mut self, rect: Rect, color: Color, thickness: f32) {
+        // Top border
+        self.paint_rect(Rect { x: rect.x, y: rect.y, width: rect.width, height: thickness }, color);
+        // Bottom border
+        self.paint_rect(Rect { x: rect.x, y: rect.y + rect.height - thickness, width: rect.width, height: thickness }, color);
+        // Left border
+        self.paint_rect(Rect { x: rect.x, y: rect.y, width: thickness, height: rect.height }, color);
+        // Right border
+        self.paint_rect(Rect { x: rect.x + rect.width - thickness, y: rect.y, width: thickness, height: rect.height }, color);
+    }
+
+    fn draw_circle(&mut self, center_x: f32, center_y: f32, radius: f32, color: Color) {
+        let x0 = (center_x - radius).max(0.0) as usize;
+        let y0 = (center_y - radius).max(0.0) as usize;
+        let x1 = (center_x + radius).min(self.width as f32) as usize;
+        let y1 = (center_y + radius).min(self.height as f32) as usize;
+
+        for y in y0..y1 {
+            for x in x0..x1 {
+                let dx = x as f32 - center_x;
+                let dy = y as f32 - center_y;
+                let dist = (dx * dx + dy * dy).sqrt();
+
+                // Draw if on the circle edge (±1px tolerance)
+                if (dist - radius).abs() <= 1.0 {
+                    self.paint_pixel(x, y, color);
+                }
+            }
+        }
+    }
+
     fn render_text(&mut self, layout_box: &LayoutBox) {
         let style_node = match layout_box.box_type {
-            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) => node,
+            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) | BoxType::FormElement(node, _) => node,
             BoxType::AnonymousBlock => return,
         };
 
@@ -294,7 +463,7 @@ impl Canvas {
 
 fn get_background_color(layout_box: &LayoutBox) -> Option<Color> {
     match layout_box.box_type {
-        BoxType::BlockNode(style_node) | BoxType::InlineNode(style_node) | BoxType::ImageNode(style_node, _) => {
+        BoxType::BlockNode(style_node) | BoxType::InlineNode(style_node) | BoxType::ImageNode(style_node, _) | BoxType::FormElement(style_node, _) => {
             style_node.background_color()
         }
         BoxType::AnonymousBlock => None,
@@ -303,7 +472,7 @@ fn get_background_color(layout_box: &LayoutBox) -> Option<Color> {
 
 fn get_border_color(layout_box: &LayoutBox) -> Option<Color> {
     match layout_box.box_type {
-        BoxType::BlockNode(style_node) | BoxType::InlineNode(style_node) | BoxType::ImageNode(style_node, _) => {
+        BoxType::BlockNode(style_node) | BoxType::InlineNode(style_node) | BoxType::ImageNode(style_node, _) | BoxType::FormElement(style_node, _) => {
             style_node.value("border-color").and_then(|v| match v {
                 crate::css_parser::Value::Color(c) => Some(c),
                 crate::css_parser::Value::Keyword(ref k) => {

@@ -34,11 +34,33 @@ pub struct LayoutBox<'a> {
     pub children: Vec<LayoutBox<'a>>,
 }
 
+#[derive(Debug, Clone)]
+pub enum FormElementType {
+    TextInput,
+    Password,
+    Email,
+    Number,
+    Button,
+    Submit,
+    Textarea,
+    Checkbox,
+    Radio,
+}
+
+#[derive(Debug, Clone)]
+pub struct FormElementData {
+    pub element_type: FormElementType,
+    pub value: String,
+    pub placeholder: String,
+    pub name: String,
+}
+
 #[derive(Debug)]
 pub enum BoxType<'a> {
     BlockNode(&'a StyledNode<'a>),
     InlineNode(&'a StyledNode<'a>),
     ImageNode(&'a StyledNode<'a>, Option<ImageData>),
+    FormElement(&'a StyledNode<'a>, FormElementData),
     AnonymousBlock,
 }
 
@@ -80,9 +102,13 @@ pub fn layout_tree<'a>(
 }
 
 fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>, image_cache: &ImageCache) -> LayoutBox<'a> {
-    // Check if this is an <img> element
+    // Check if this is a form element, image, or regular element
     let box_type = if let NodeType::Element(elem) = &style_node.node.node_type {
-        if elem.tag_name == "img" {
+        // Check for form elements first
+        if elem.tag_name == "input" || elem.tag_name == "button" || elem.tag_name == "textarea" {
+            let form_data = create_form_element_data(elem);
+            BoxType::FormElement(style_node, form_data)
+        } else if elem.tag_name == "img" {
             // Try to load the image
             eprintln!("Found <img> tag");
             let image_data = elem.attributes.get("src")
@@ -132,6 +158,42 @@ fn build_layout_tree<'a>(style_node: &'a StyledNode<'a>, image_cache: &ImageCach
     root
 }
 
+fn create_form_element_data(elem: &crate::dom::ElementData) -> FormElementData {
+    let element_type = if elem.tag_name == "button" {
+        let button_type = elem.attributes.get("type").map(|s| s.as_str()).unwrap_or("submit");
+        match button_type {
+            "submit" => FormElementType::Submit,
+            _ => FormElementType::Button,
+        }
+    } else if elem.tag_name == "textarea" {
+        FormElementType::Textarea
+    } else {
+        // input element - check type attribute
+        let input_type = elem.attributes.get("type").map(|s| s.as_str()).unwrap_or("text");
+        match input_type {
+            "password" => FormElementType::Password,
+            "email" => FormElementType::Email,
+            "number" => FormElementType::Number,
+            "checkbox" => FormElementType::Checkbox,
+            "radio" => FormElementType::Radio,
+            "submit" => FormElementType::Submit,
+            "button" => FormElementType::Button,
+            _ => FormElementType::TextInput,
+        }
+    };
+
+    let value = elem.attributes.get("value").cloned().unwrap_or_default();
+    let placeholder = elem.attributes.get("placeholder").cloned().unwrap_or_default();
+    let name = elem.attributes.get("name").cloned().unwrap_or_default();
+
+    FormElementData {
+        element_type,
+        value,
+        placeholder,
+        name,
+    }
+}
+
 impl<'a> LayoutBox<'a> {
     fn new(box_type: BoxType<'a>) -> LayoutBox<'a> {
         LayoutBox {
@@ -143,7 +205,7 @@ impl<'a> LayoutBox<'a> {
 
     fn get_inline_container(&mut self) -> &mut LayoutBox<'a> {
         match self.box_type {
-            BoxType::InlineNode(_) | BoxType::AnonymousBlock | BoxType::ImageNode(_, _) => self,
+            BoxType::InlineNode(_) | BoxType::AnonymousBlock | BoxType::ImageNode(_, _) | BoxType::FormElement(_, _) => self,
             BoxType::BlockNode(_) => {
                 match self.children.last() {
                     Some(&LayoutBox {
@@ -162,6 +224,7 @@ impl<'a> LayoutBox<'a> {
             BoxType::BlockNode(_) => self.layout_block(containing_block),
             BoxType::InlineNode(_) | BoxType::AnonymousBlock => self.layout_inline(containing_block),
             BoxType::ImageNode(_, _) => self.layout_image(containing_block),
+            BoxType::FormElement(_, _) => self.layout_form_element(containing_block),
         }
     }
 
@@ -206,6 +269,44 @@ impl<'a> LayoutBox<'a> {
             // No image data, use small default
             self.dimensions.content.width = 10.0;
             self.dimensions.content.height = 10.0;
+        }
+    }
+
+    fn layout_form_element(&mut self, containing_block: Dimensions) {
+        // Set position
+        self.dimensions.content.x = containing_block.content.x;
+        self.dimensions.content.y = containing_block.content.y + containing_block.content.height;
+
+        // Get form element dimensions based on type
+        if let BoxType::FormElement(_, form_data) = &self.box_type {
+            match form_data.element_type {
+                FormElementType::TextInput | FormElementType::Password |
+                FormElementType::Email | FormElementType::Number => {
+                    // Standard input field dimensions
+                    self.dimensions.content.width = 200.0_f32.min(containing_block.content.width);
+                    self.dimensions.content.height = 30.0;
+                }
+                FormElementType::Button | FormElementType::Submit => {
+                    // Button dimensions based on content or default
+                    let text_width = if form_data.value.is_empty() { 80.0 } else { (form_data.value.len() as f32 * 8.0) + 20.0 };
+                    self.dimensions.content.width = text_width.min(containing_block.content.width);
+                    self.dimensions.content.height = 32.0;
+                }
+                FormElementType::Textarea => {
+                    // Larger text area
+                    self.dimensions.content.width = 300.0_f32.min(containing_block.content.width);
+                    self.dimensions.content.height = 100.0;
+                }
+                FormElementType::Checkbox | FormElementType::Radio => {
+                    // Small checkbox/radio button
+                    self.dimensions.content.width = 16.0;
+                    self.dimensions.content.height = 16.0;
+                }
+            }
+        } else {
+            // Default dimensions
+            self.dimensions.content.width = 100.0;
+            self.dimensions.content.height = 30.0;
         }
     }
 
@@ -335,7 +436,7 @@ impl<'a> LayoutBox<'a> {
 
     fn get_style_node(&self) -> &'a StyledNode<'a> {
         match self.box_type {
-            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) => node,
+            BoxType::BlockNode(node) | BoxType::InlineNode(node) | BoxType::ImageNode(node, _) | BoxType::FormElement(node, _) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block has no style node"),
         }
     }
